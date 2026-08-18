@@ -8,6 +8,7 @@ o inventário de escopo da Fase 5 e o mapa de testes da Fase 6 se ligam a este a
 | id | Critério (REQUISITOS §6 / S-n da Fase 0) | Módulo | Como se verifica |
 |---|---|---|---|
 | VAL-01 | Dado o deck, o agendador apresenta **apenas** os cartões devidos | session | Conjunto apresentado = `{c : dueAt(c) ≤ agora}`, com relógio injetado |
+| VAL-01b | A ordem da fila é `(dueAt, id)` ascendente, e cartão **nunca revisado** (`dueAt = 0`, I-7) vem antes de qualquer vencido com instante real | session | Fila determinística entre execuções; os novos precedem os vencidos |
 | VAL-02 | A nota `q` é registrada e o próximo intervalo é recomputado conforme a §4 | scheduler, storage | Vetores V-1 a V-4 de `specs/datasets/sm2-vectors.md`, conferidos valor a valor |
 | VAL-03 | A ordem de avaliação é a da §4: `I` usa o `EF` **anterior**, e o `EF` é atualizado depois | scheduler | Vetor V-3, passo 3: `round(6 × 2.7) = 16` |
 | VAL-04 | `EF` nunca fica abaixo de 1,3 | scheduler | Vetor V-2: cinco zeros, piso alcançado no 2º e mantido |
