@@ -224,6 +224,8 @@ transcreveu a especificação. É caso de discrição **terceirizável**: a bate
 responder isto por regra ("alvo = o que a especificação congelada disser"), sem operador
 humano no laço. Primeiro item concreto da lista que o §5 do `PILOTO.md` manda levantar.
 
+**Dado sobre a própria pergunta do §5:** a coordenação propôs em 2026-08-18 terceirizar a discrição para um conjunto de regras derivadas da especificação congelada; a operadora manteve a discrição consigo. Para a decisão de operador ainda aberta, isto é observação, não falha: mede-se o que o operador humano de fato faz quando a alternativa existe e está posta.
+
 Placar de G0, cinco decisões: **quatro terceirizáveis** por regra derivada da especificação
 congelada (alvo de entrega, lapso `q<3`, migração de deck, política de pesquisa) e **uma
 genuína** (o remoto), que a especificação delega de propósito. A batelada válida pode tirar o
@@ -235,6 +237,7 @@ Todo descarte e toda intervenção, nos dois braços, no ato.
 
 | data | braço | o quê | motivo |
 |---|---|---|---|
+| 2026-08-18 | coordenação | a coordenação comentou o **mérito** das opções de G0 antes da submissão (escopo da pesquisa, escolha do remoto) e propôs substituir a discrição por um conjunto de regras derivadas da especificação | **intervenção no tratamento, registrada como tal.** Partiu de quem leu o `PILOTO.md` e conhece a hipótese, o braço esperado e o local do efeito — a pior origem possível. A operadora determinou que a coordenação não interrompa e que a operação siga a critério dela, o que é a leitura correta do §5: os *gates* decidem e a discrição é dado a registrar, não variável a corrigir. A partir daqui a coordenação **registra e mede, não opina sobre mérito**. O que já foi dito não se desfaz e fica no registro para quem ler o dado |
 | 2026-08-18 | C | `init_project` chamado à mão pela operadora **antes** do `start`, com `projectName` "Chinese Xpress" e descrição "App de aprendizado de chinês" | desvio do roteiro, **sem efeito sobre o dado**: o estado ficou em Fase 0, iteração 1, com `decisions`, `activatedLenses`, `exitCriteria` e `projectSpec` vazios — exatamente onde o `start` pararia. O hook de `SessionStart` prevê o caminho (*greenfield: ask the user for a project name and description, then call init_project directly*), então a operadora fez à mão o que a sessão faria ao perguntar. Nome e descrição são entrada da operadora nos dois caminhos. Efeitos colaterais comitados em `94f3cef`+1 antes de qualquer código: hooks `PreCompact`/`SessionStart` no `settings.json` e `specs/README.md` |
 | 2026-08-18 | C | `versus-claude` 0.16.3 instalado por `preparar-braco-c.py`, commit `94f3cef`, antes de qualquer código | provenance do instrumento no próprio histórico do braço, como o `REQUISITOS.md` é para a especificação. `.versus/state.json` fica fora do commit (muda a cada chamada de ferramenta) e será arquivado no repositório de coordenação ao fim do braço |
 | 2026-08-18 | instrumento de medição | `extrair.py` ganha o **churn retroativo de linha** como secundária, definição do §3e | reproduz `0 · 54 · 100` do braço A e não altera a primária; renomeação de arquivo não conta aqui (o git a detecta como rename), quem a pega é a medida de interface — as duas são complementares |
