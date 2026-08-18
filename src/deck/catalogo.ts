@@ -27,6 +27,11 @@ export function idsDeDecks(): readonly string[] {
   return ENTRADAS.map((e) => e.id);
 }
 
+/** Os decks de entrada, com seus rótulos, sem carregá-los. */
+export function catalogoDeDecks(): ReadonlyArray<{ readonly id: string; readonly rotulo: string }> {
+  return ENTRADAS.map((e) => ({ id: e.id, rotulo: e.rotulo }));
+}
+
 /** Valida e identifica um deck do catálogo. Cai no padrão se o id não existir. */
 export function carregarDeck(id: string = DECK_PADRAO): DeckIdentificado {
   const entrada = ENTRADAS.find((e) => e.id === id) ?? ENTRADAS[0];

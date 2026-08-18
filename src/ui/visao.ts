@@ -10,7 +10,7 @@ export interface LinhaResumo {
   readonly intervaloDias: number;
 }
 
-/** O que a interface precisa saber para desenhar a tela. Nada além disto. */
+/** O corpo da tela. */
 export type Visao =
   | {
       readonly tipo: 'revisao';
@@ -32,9 +32,29 @@ export type Visao =
       readonly mensagem: string;
     };
 
+/** Uma opção de deck de entrada oferecida no cabeçalho. */
+export interface OpcaoDeck {
+  readonly id: string;
+  readonly rotulo: string;
+  readonly selecionado: boolean;
+}
+
+/** Tudo o que a interface desenha: o corpo mais o cabeçalho e os avisos. */
+export interface Tela {
+  readonly visao: Visao;
+  readonly decks: readonly OpcaoDeck[];
+  /** Mensagem passageira: migração de deck, falha de gravação, registro ilegível. */
+  readonly aviso: string | null;
+  readonly offline: boolean;
+  /** Falso quando o navegador negou armazenamento e nada será persistido. */
+  readonly persistente: boolean;
+}
+
 /** Comandos que a interface pode disparar. */
 export interface Acoes {
   revelar(): void;
   responder(q: Nota): void;
   reiniciar(): void;
+  dispensarAviso(): void;
+  trocarDeck(id: string): void;
 }

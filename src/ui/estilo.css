@@ -133,3 +133,51 @@ button { font: inherit; cursor: pointer; }
 .resumo__hanzi { font-family: var(--fonte-hanzi); font-size: 1.125rem; }
 .resumo__gloss { color: var(--texto-fraco); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .resumo__intervalo { color: var(--texto-fraco); }
+
+.cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.cabecalho__decks {
+  font: inherit;
+  font-size: 0.875rem;
+  padding: 0.375rem 0.5rem;
+  border: 1px solid var(--borda);
+  border-radius: 8px;
+  background: var(--superficie);
+  color: var(--texto);
+}
+
+.cabecalho__marcas { display: flex; gap: 0.375rem; }
+
+.marca {
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  border: 1px solid var(--borda);
+  color: var(--texto-fraco);
+}
+.marca--offline { border-color: var(--destaque); color: var(--destaque); }
+.marca--alerta { border-color: var(--erro); color: var(--erro); }
+
+.aviso {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem 0.875rem;
+  border: 1px solid var(--destaque);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--destaque) 12%, transparent);
+}
+.aviso__texto { margin: 0; font-size: 0.875rem; flex: 1; }
+.aviso__fechar {
+  border: 0;
+  background: none;
+  color: var(--texto-fraco);
+  font-size: 0.8125rem;
+  text-decoration: underline;
+  padding: 0;
+}

@@ -1,4 +1,4 @@
-import type { Acoes, Visao } from './visao.js';
+import type { Acoes, Tela, Visao } from './visao.js';
 import { ESCALA_NOTAS } from './notas.js';
 
 function elemento(tag: string, classe?: string, texto?: string): HTMLElement {
@@ -21,14 +21,44 @@ function dias(n: number): string {
   return n === 1 ? '1 dia' : `${n} dias`;
 }
 
+function cabecalho(tela: Tela, acoes: Acoes): HTMLElement {
+  const barra = elemento('header', 'cabecalho');
+
+  const seletor = document.createElement('select');
+  seletor.className = 'cabecalho__decks';
+  seletor.setAttribute('aria-label', 'deck de estudo');
+  for (const opcao of tela.decks) {
+    const item = document.createElement('option');
+    item.value = opcao.id;
+    item.textContent = opcao.rotulo;
+    item.selected = opcao.selecionado;
+    seletor.append(item);
+  }
+  seletor.addEventListener('change', () => acoes.trocarDeck(seletor.value));
+  barra.append(seletor);
+
+  const marcas = elemento('div', 'cabecalho__marcas');
+  if (tela.offline) marcas.append(elemento('span', 'marca marca--offline', 'offline'));
+  if (!tela.persistente) marcas.append(elemento('span', 'marca marca--alerta', 'sem persistência'));
+  barra.append(marcas);
+
+  return barra;
+}
+
+function avisoDe(mensagem: string, acoes: Acoes): HTMLElement {
+  const bloco = elemento('div', 'aviso');
+  bloco.setAttribute('role', 'status');
+  bloco.append(elemento('p', 'aviso__texto', mensagem));
+  bloco.append(botao('dispensar', 'aviso__fechar', () => acoes.dispensarAviso()));
+  return bloco;
+}
+
 function telaRevisao(
   visao: Extract<Visao, { tipo: 'revisao' }>,
   acoes: Acoes,
 ): readonly HTMLElement[] {
   const barra = elemento('div', 'andamento');
-  barra.append(
-    elemento('span', 'andamento__texto', `${visao.respondidos + 1} de ${visao.total}`),
-  );
+  barra.append(elemento('span', 'andamento__texto', `${visao.respondidos + 1} de ${visao.total}`));
   const trilho = elemento('div', 'andamento__trilho');
   const preenchido = elemento('div', 'andamento__preenchido');
   preenchido.style.width = `${(visao.respondidos / visao.total) * 100}%`;
@@ -115,28 +145,29 @@ function telaNadaDevido(
   return [bloco];
 }
 
-/** Desenha a visão inteira dentro de `raiz`, substituindo o conteúdo anterior. */
-export function renderizar(raiz: HTMLElement, visao: Visao, acoes: Acoes): void {
-  raiz.replaceChildren();
-
+function corpo(visao: Visao, acoes: Acoes): readonly HTMLElement[] {
   switch (visao.tipo) {
     case 'revisao':
-      raiz.append(...telaRevisao(visao, acoes));
-      return;
+      return telaRevisao(visao, acoes);
     case 'fim':
-      raiz.append(...telaFim(visao, acoes));
-      return;
+      return telaFim(visao, acoes);
     case 'nada-devido':
-      raiz.append(...telaNadaDevido(visao, acoes));
-      return;
+      return telaNadaDevido(visao, acoes);
     case 'erro': {
       const bloco = elemento('section', 'erro');
       bloco.append(
         elemento('h1', 'resumo__titulo', 'Não foi possível carregar o deck'),
         elemento('p', 'resumo__linha', visao.mensagem),
       );
-      raiz.append(bloco);
-      return;
+      return [bloco];
     }
   }
+}
+
+/** Desenha a tela inteira dentro de `raiz`, substituindo o conteúdo anterior. */
+export function renderizar(raiz: HTMLElement, tela: Tela, acoes: Acoes): void {
+  raiz.replaceChildren();
+  raiz.append(cabecalho(tela, acoes));
+  if (tela.aviso !== null) raiz.append(avisoDe(tela.aviso, acoes));
+  raiz.append(...corpo(tela.visao, acoes));
 }
