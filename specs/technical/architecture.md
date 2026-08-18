@@ -271,3 +271,83 @@ Escopo negativo idêntico ao de V(1) e V(2). Estratégia de cache idêntica à d
 mudança: **o ciclo de vida deixa de usar `skipWaiting`/`clients.claim`** — o service worker novo
 espera, `activate` limpa os caches de outras versões, e a página detecta o worker em espera e
 oferece recarregar. Fecha MIG-04 sem reabrir MIG-02.
+
+---
+
+## V(4)
+
+Resposta aos 22 achados da Iteração 3. Os dois críticos tinham a **mesma raiz**, e a raiz não
+era um erro de implementação: era ter guardado, em `meta`, cursores que **descrevem** o log sem
+serem **derivados** dele. Dois estados independentes podem discordar, e discordaram das duas
+formas possíveis — o log esvaziou e o cursor não (ASS-12), o servidor voltou no tempo e o cursor
+não (ASS-13). V(4) elimina a classe inteira: **o cursor deixa de existir como estado próprio**.
+
+| id | module | responsibility | interface | depends-on |
+|------|--------|----------------|-----------|------------|
+| M-01 | scheduler | SM-2 da §4, literal e puro. `Math.round` (meio para +∞) fixado; `EF` nunca arredondado | `initialState() -> SchedulingState`; `applyGrade(s, q, at) -> SchedulingState`; `dueAt(s) -> number`; `isDue(s, now) -> boolean` | — |
+| M-02 | review-log | Ordem total, união por `eventId` e dobra em estado. Puro | `merge(a, b) -> ReviewEvent[]`; `fold(events) -> Map<CardId, SchedulingState>`; `applyOne(state, e) -> SchedulingState`; `orderKey(e) -> [number, string, number]` | scheduler |
+| M-03 | session | Apura devidos, ordena por `(dueAt, id)`, percorre. `grade` produz `ReviewDraft` **com token de correspondência**; só `commit` avança, e recusa rascunho que não seja do cartão corrente | `open(deck, states, now) -> Session`; `current(s) -> Card \| null`; `reveal(s) -> Session`; `grade(s, q) -> ReviewDraft`; `commit(s, draft, evento) -> Session`; `isComplete(s) -> boolean` | scheduler, deck |
+| M-04 | deck | Valida o formato §5; versão por FNV-1a de 32 bits sobre a forma canônica (fonte citada); difere versões; ids ativos. Erros como `DeckError`. Puro | `parse(json) -> Deck`; `versionOf(deck) -> string`; `diff(prev, next) -> {added, removed, edited}`; `activeCardIds(deck) -> Set<CardId>` | — |
+| M-05 | storage | Repository + IndexedDB. `seq` de `meta` na mesma transação do append. **O estado de entrega vive em CADA evento (`sseq`), não num registro à parte**: pendente é evento com `sseq` nulo, e o cursor de leitura é o `sseq` máximo do log | `append(draft) -> Promise<ReviewEvent>`; `ingest(events) -> Promise<{novos, jaConhecidos}>`; `all() -> Promise<ReviewEvent[]>`; `pending() -> Promise<ReviewEvent[]>`; `markDelivered(entries) -> Promise<void>`; `cursor() -> Promise<{maxSseq, epoch}>`; `setEpoch(e) -> Promise<void>`; `replicaId() -> Promise<string>`; `deckVersion() -> Promise<string \| null>`; `setDeckVersion(v) -> Promise<void>`; `health() -> Promise<StorageHealth>`; `mode() -> 'idb' \| 'memoria'` | — |
+| M-06 | sync | Protocolo sobre `sseq` e `epoch`; estado `idle\|running`; sem repetição automática; **empurra tudo que está pendente num único pedido**; grava os puxados antes de marcar entrega | `push() -> Promise<SyncReport>`; `pull() -> Promise<SyncReport>`; `synchronize() -> Promise<SyncReport>`; `state() -> 'idle' \| 'running'` | review-log, storage |
+| M-07 | ui | Casco (HTML, CSS, `manifest.webmanifest`, ícone) e tela de revisão. Não depende de nada; `ViewModel` declarado; atualização dirigida que preserva foco; **precedência declarada entre os estados ambientes**; só `textContent` | `mount(root, handlers) -> void`; `render(vm: ViewModel) -> void` | — |
+| M-08 | app | Composição e laço do caso de uso, com sequência de arranque **e seu caminho de falha** declarados, exclusão mútua entre nota e sincronização, e resposta declarada a `append` que falha | `start(ports: Ports) -> Promise<void>`; `diag() -> Diagnostico` | scheduler, review-log, session, deck, storage, sync, ui |
+| M-09 | service-worker | Precache do casco a partir de `precache-manifest.json`; cache nomeado pelo hash do manifesto; `activate` apaga os demais **e chama `clients.claim`**; **sem `skipWaiting`** | eventos `install`, `activate`, `fetch`; `buildPrecacheManifest()` (build) | — |
+| M-10 | server | Só HTTP: rotas, limite de corpo de 1 MiB, **`Origin` exigido e conferido em todo `/events`** (por isso o puxão é `POST`), bind em `127.0.0.1`, estáticos por allowlist com tipos MIME declarados, `GET /health` | `POST /events` ; `POST /events/pull` ; `GET /health` ; estáticos | event-store |
+| M-11 | event-store | JSONL append-only com `fsync` do arquivo **e do diretório na criação**, fila serializada, `sseq` e `epoch`, índice `eventId -> sseq` em memória, trava de instância com pid reclamável, contrato de erro explícito | `append(events) -> Promise<{stored: {eventId, sseq}[], epoch}>`; `after(sseq) -> Promise<{events, sseq, epoch}>`; `health() -> Health`; erros `EventStoreError{code}` | review-log |
+
+### A mudança estrutural: o cursor deixa de ser estado
+
+Antes, `meta` guardava `watermarks: {pushed, pulled}` — dois números que **descreviam** o log e
+podiam discordar dele. Agora:
+
+| Grandeza | Antes (V3) | Agora (V4) |
+|---|---|---|
+| O que já foi lido do servidor | `watermarks.pulled` em `meta` | **`max(sseq)` sobre o log** — derivado |
+| O que falta enviar | `watermarks.pushed` em `meta` | **eventos com `sseq` nulo** — derivado |
+| Reação a servidor restaurado | zerar `pulled` (e esquecer `pushed`) | `setEpoch` **limpa o `sseq` de todos os eventos**: tudo é repuxado e reenviado, idempotente por `eventId` |
+
+Esvaziar o store `events` agora zera os dois cursores **por construção**, porque eles vivem
+dentro dos eventos. ASS-12 e ASS-13 deixam de ser consertáveis porque deixam de ser possíveis.
+O custo honesto: o contrato de `storage` trocou 2 métodos por 4. O ganho: sumiu uma classe
+inteira de defeito — dois estados independentes que podem discordar.
+
+### Demais resoluções
+
+| Achado | Resolução |
+|---|---|
+| ASS-14 | Premissa **A-19**: o arquivo do servidor é a união das réplicas de **um** estudante e obedece ao mesmo teto de 10⁵ eventos de A-6; medido na Fase 6 |
+| ARQ-07 | `ReviewDraft` carrega `cardId` e um token de geração da sessão; `commit(s, draft, evento)` recusa rascunho que não corresponda ao cartão corrente |
+| IMP-07 | Caminho de falha do arranque declarado: `DeckError` → tela de erro com motivo; nunca sessão sobre deck inválido |
+| SEC-09 | `ingest` recusa evento que reivindique o **nosso** `replicaId` e não esteja já no log; no arranque, `nextSeq = max(nextSeq, maiorSeqPróprio + 1)` |
+| SEC-10 | `Sec-Fetch-Site` **abandonado** como alternativa. O puxão vira `POST /events/pull`, porque o navegador sempre envia `Origin` em `POST` — a verificação passa a valer para todo `/events`. O resíduo de cliente não-navegador é o de SEC-01, já aceito |
+| PERF-06 | `push` envia **todos** os pendentes num único pedido: um `fsync` por sincronização, não por revisão |
+| PERF-07 | Declarado: o índice guarda `eventId -> sseq`, não os eventos; não há duplicação |
+| RES-08 | `fsync` também no **diretório**, uma vez, na criação do arquivo |
+| RES-09 | A trava guarda o pid; no arranque, pid morto é trava órfã e é reclamada, com mensagem que diz o que fez |
+| MIG-05 | **`clients.claim()` restaurado** no `activate` (sem `skipWaiting`): na primeira visita não há worker antigo, então o novo assume e a partida a frio offline vale já a partir da primeira carga. Fecha sem reabrir MIG-04 |
+| UX-06 | Precedência declarada: armazenamento volátil > nova versão > sincronização > sessão vazia. **No máximo uma faixa por vez** |
+| UX-07 | Declarado: ignorar o aviso mantém a versão velha funcionando; nada bloqueia a revisão |
+| PRO-05 | `append` que falha mantém a sessão no mesmo cartão, com faixa "nota não registrada" e ação de repetir |
+| GOV-04 | `GET /health` exposto, sem dado sensível |
+| CTL-05 | `SyncReport` carrega contagens de progresso, e a interface mostra quanto está sendo trazido |
+| LIN-09 | `append` passa a devolver `epoch` também: quem só empurra detecta a restauração |
+| LIN-10 | `ingest -> {novos, jaConhecidos}` |
+| OBS-05 | `storage.health()` espelha o do servidor; `diag()` compõe os dois |
+| REG-05 | Tipos MIME declarados na allowlist de estáticos, `manifest.webmanifest` inclusive |
+| MEC-07 | **Aceito com justificativa**, e A-17 reescrita: em macOS o `fsync` do Node não alcança o prato do disco (exigiria `F_FULLFSYNC`, indisponível sem dependência nativa, que a pilha proíbe). A durabilidade prometida é ao nível do cache do sistema operacional, e o texto passa a dizer isso |
+
+### Premissas alteradas
+
+| # | Premissa | Estado |
+|---|---|---|
+| A-17 | `stored` é promessa de durabilidade **ao nível do cache do sistema operacional**: o `append` só responde depois de `fsync` do arquivo, e do diretório na criação. Em macOS isso não alcança o prato do disco | **reescrita em V(4)** |
+| A-19 | **O arquivo do servidor é a união das réplicas de um único estudante e obedece ao mesmo teto de 10⁵ eventos de A-6** | **nova** |
+
+A-1 a A-16 e A-18 seguem exatamente como escritas em V(2) e V(3) — inclusive A-1, que
+`clients.claim` volta a tornar verdadeira como está escrita.
+
+### Escopo negativo e estratégia de cache
+
+Escopo negativo idêntico ao de V(1), V(2) e V(3). Estratégia de cache idêntica à de V(3), com
+`clients.claim` de volta no `activate` e `skipWaiting` seguindo ausente.
