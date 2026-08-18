@@ -117,7 +117,7 @@ Todo descarte e toda intervenção, nos dois braços, no ato.
 
 | data | braço | o quê | motivo |
 |---|---|---|---|
-| — | — | — | — |
+| 2026-08-18 | instrumento de medição | `extrair.py`: resolvedor de import passa a desfazer a troca ESM do TypeScript (`../deck/index.js` → `index.ts`) | com o bug, **nenhuma** aresta entre módulos resolvia e `E` ficava zerada nos dois braços — um terço da DV morto sem sinal. Detectado no aviso de imports não resolvidos, ao verificar o incremento 1 do braço A, antes de qualquer extração definitiva. Regressão contra o histórico sintético do §3c refeita e idêntica (`16` · `1,2308`). Nenhum dado havia sido extraído antes da correção |
 
 ## 6. Violações de protocolo
 

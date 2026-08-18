@@ -42,7 +42,12 @@ import sys
 from pathlib import PurePosixPath
 
 CODIGO = {".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"}
-RESOLVE = [""] + [e for e in (".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs")]
+RESOLVE = ["", ".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"]
+# TypeScript sob ESM importa o .ts ESCREVENDO .js ("../deck/index.js" -> index.ts).
+# Sem desfazer a troca, nenhuma aresta entre módulos resolve e E fica zerada.
+TROCA_ESM = {".js": (".ts", ".tsx"), ".jsx": (".tsx",), ".mjs": (".mts",), ".cjs": (".cts",)}
+# import de asset não é aresta de módulo; não conta e não vira aviso.
+ASSET = {".json", ".css", ".scss", ".svg", ".png", ".jpg", ".webp", ".txt", ".md", ".wasm"}
 
 # import ... from 'x' | export ... from 'x' | import('x') | require('x')
 RE_IMPORT = re.compile(
@@ -123,12 +128,15 @@ def resolver(origem, spec, arquivos):
         return None
     base = (PurePosixPath(origem).parent / spec)
     base = PurePosixPath(*_normalizar(base.parts))
-    for ext in RESOLVE:
-        cand = f"{base}{ext}"
-        if cand in arquivos:
-            return cand
-    for ext in RESOLVE[1:]:
-        cand = f"{base}/index{ext}"
+
+    candidatos = [f"{base}{ext}" for ext in RESOLVE]
+    trocas = TROCA_ESM.get(base.suffix)
+    if trocas:
+        raiz = str(base)[: -len(base.suffix)]
+        candidatos = [f"{raiz}{ext}" for ext in trocas] + candidatos
+    candidatos += [f"{base}/index{ext}" for ext in RESOLVE[1:]]
+
+    for cand in candidatos:
         if cand in arquivos:
             return cand
     return None
@@ -167,7 +175,7 @@ def estado(repo, sha):
         for spec in RE_IMPORT.findall(texto):
             alvo = resolver(path, spec, arquivos)
             if alvo is None:
-                if spec.startswith("."):
+                if spec.startswith(".") and PurePosixPath(spec).suffix not in ASSET:
                     nao_resolvidos.append(f"{path} -> {spec}")
                 continue
             m_alvo = modulo(alvo)
