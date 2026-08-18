@@ -1,0 +1,14 @@
+[
+  { "id": "c001", "hanzi": "你好", "pinyin": "nǐ hǎo", "gloss": "hello" },
+  { "id": "c002", "hanzi": "谢谢", "pinyin": "xiè xie", "gloss": "thank you" },
+  { "id": "c003", "hanzi": "再见", "pinyin": "zài jiàn", "gloss": "goodbye" },
+  { "id": "c004", "hanzi": "我", "pinyin": "wǒ", "gloss": "I, me" },
+  { "id": "c005", "hanzi": "你", "pinyin": "nǐ", "gloss": "you" },
+  { "id": "c006", "hanzi": "是", "pinyin": "shì", "gloss": "to be" },
+  { "id": "c007", "hanzi": "不", "pinyin": "bù", "gloss": "not" },
+  { "id": "c008", "hanzi": "水", "pinyin": "shuǐ", "gloss": "water" },
+  { "id": "c009", "hanzi": "茶", "pinyin": "chá", "gloss": "tea" },
+  { "id": "c010", "hanzi": "书", "pinyin": "shū", "gloss": "book" },
+  { "id": "c011", "hanzi": "学生", "pinyin": "xué shēng", "gloss": "student" },
+  { "id": "c012", "hanzi": "老师", "pinyin": "lǎo shī", "gloss": "teacher" }
+]
