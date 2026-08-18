@@ -39,6 +39,30 @@ Qualquer um dos dois motivos bastaria. Juntos não deixam alternativa.
 - evidência do fetch (`FETCH_HEAD` e reflog) preservada fora do braço
 - medição do incremento 1 antes do descarte: `t₀` 15/16 · churn 41 · `|M|`=8 `|E|`=12 `|I|`=73 · LOC 1221
 
+## Trabalho não comitado no momento do descarte
+
+A sessão seguiu construindo o incremento 2 **depois** do `fetch`, e esse trabalho está no
+*work tree* sem commit. Deixado exatamente como estava — não comitado, não removido — porque
+é evidência, não artefato:
+
+```
+ M src/ui/shell/index.html            18:28:49
+ M tsconfig.browser.json              18:28:49
+ ?? src/service-worker/index.ts       18:28:33
+ ?? src/storage/indexeddb.ts          18:27:08
+ ?? src/ui/shell/manifest.webmanifest 18:28:49
+ ?? src/ui/shell/icone.svg            18:28:49
+```
+
+Cronologia completa: último commit do incremento 1 às **18:21:11** · `git fetch` às **18:25:58**
+· persistência IndexedDB e *service worker* do incremento 2 escritos entre **18:27:08 e 18:28:49**
+· nada escrito depois disso.
+
+Ou seja, o incremento 2 estava sendo construído **dentro da janela de exposição**, com o
+histórico completo do braço A e o `PILOTO.md` alcançáveis de dentro do próprio repositório.
+O incremento 1 é anterior à exposição e permanece limpo; o incremento 2 nasceu dentro dela.
+Isto não estava disponível quando o descarte foi decidido, e o confirma.
+
 ## O que NÃO se descarta
 
 Os achados de medibilidade do piloto não dependem de o tratamento estar limpo, e seguem
