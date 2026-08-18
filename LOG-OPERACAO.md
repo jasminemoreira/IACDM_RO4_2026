@@ -39,6 +39,7 @@ operadora declarou o aceite:
 |---|---|---|---|---|---|
 | 1 | `inc1-fim` | `9cf6095` | 2026-08-18 | 11 | `5952cdc`, posição 4/11 |
 | 2 | `inc2-fim` | `779fcb3` | 2026-08-18 | 5 | `be2c0ef`, posição 1/5 |
+| 3 | `inc3-fim` | `e6fe2dc` | 2026-08-18 | 6 | `be4ddfc`, posição 1/6 |
 
 ## 3. Decisões de montagem — coordenação, antes do início
 
@@ -139,6 +140,48 @@ mexe no que veio antes.
 **Momento da decisão:** braço A no meio do incremento 2, braço C não iniciado, nenhuma
 comparação entre braços existente. A medida não pôde ser ajustada a um resultado porque
 não havia resultado.
+
+## 3e. Achado do braço A — a DV não vê o retrabalho que ela existe para medir
+
+Registrado em 2026-08-18, com o braço A concluído e o **braço C não iniciado**.
+
+O evento que o §6 do `PILOTO.md` prevê aconteceu, e de forma inequívoca: o commit
+`be4ddfc` do incremento 3 (*"progresso derivado de um log de revisões, com migração do
+modelo 1 para o 2"*) reescreveu o modelo de persistência criado no incremento 2 — 176
+linhas apagadas em `storage/modelo.ts`, `migracao.ts` e `repositorio.ts`.
+
+A DV registrada quase não o vê. Dois defeitos independentes, ambos estruturais:
+
+**1. Janela.** `t₀(3)` **é** o commit `be4ddfc`. A primária conta commits `> t₀(k)`, então o
+único commit de retrabalho arquitetural do braço inteiro está fora da janela por definição.
+Não é acidente deste projeto: retrabalho tende a vir *primeiro* no incremento — refatora-se
+para abrir espaço, depois constrói-se — e é exatamente esse commit que a fórmula exclui.
+`t₀` caiu na posição 1 em dois dos três incrementos.
+
+**2. Sensibilidade.** `M`, `E` e `I` medem a *superfície* do módulo. A reescrita preservou a
+superfície: dos 176 apagados, o efeito em `I` foi **um** símbolo removido
+(`storage.gravarProgresso`). Uma troca de modelo interno que mantém a interface é invisível
+à DV.
+
+Consequência para o §7: a leitura literal da tabela dá **GO** — churn pós-`t₀` = 108 > 0,
+`t₀` localizável, extração automática. Seria GO pelo motivo errado: os 108 são construção
+(módulo novo, exports novos), e o retrabalho real vale 0 na primária e 1 na secundária.
+A tabela do §7 não tem linha para "DV computável, porém insensível ao construto".
+
+### Candidata registrada antes do braço C: churn retroativo de linha
+
+Linhas removidas/alteradas em arquivos sob `src/` que **já existiam** no aceite do
+incremento anterior, excluindo teste e arquivo criado no próprio incremento:
+
+| inc | interface (`retro`) | linha |
+|---|---|---|
+| 1 | 0 | 0 |
+| 2 | 0 | 54 |
+| 3 | 0 (+1 em `t₀`) | **100**, dos quais 85 em `storage/` |
+
+Registrada aqui, com definição fechada, **antes de o braço C rodar** — mesma disciplina do
+§3d. Foi vista sobre o braço A, o que é limitação real e fica escrita: nenhuma comparação
+entre braços existia no momento do registro, mas o braço A existia.
 
 ## 4. Discrição da operadora nos *gates* — braço C
 
