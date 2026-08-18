@@ -1,0 +1,11 @@
+CONGELAMENTO DA ESPECIFICACAO — RO4 piloto
+
+arquivo : TAREFA-PILOTO.md
+sha256  : e7dbfd80d7431f847c965d3aae2053bcf3ba2e2d95d2304707196892608144f0
+congelado em: 2026-08-18 17:04 UTC
+
+Copiado como REQUISITOS.md na raiz de pilot_proj/ e pilot_direct/.
+Qualquer divergencia de hash apos esta data invalida o piloto.
+
+verificar com:
+  sha256sum TAREFA-PILOTO.md pilot_proj/REQUISITOS.md pilot_direct/REQUISITOS.md
