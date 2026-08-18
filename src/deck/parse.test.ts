@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ErroFormatoDeck, cartaoPorId, parseDeck } from './index.js';
-import exemplo from '../../decks/exemplo.json' with { type: 'json' };
+import exemplo from '../../decks/exemplo.json';
 
 describe('parseDeck', () => {
   it('aceita o deck de exemplo fornecido como entrada', () => {
