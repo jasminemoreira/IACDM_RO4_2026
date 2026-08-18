@@ -108,3 +108,34 @@ inversão de dependência — e reexame de tudo o mais.
 | LIN-08 | event-store | Linguistics / Grammar | 🟡 | `append(events) -> {stored}` não diz se `stored` inclui os eventos **já conhecidos** (deduplicados) ou só os novos. O cliente precisa dos dois casos como "entregue" para avançar a marca d'água; a leitura errada faz reenviar para sempre |
 | MEC-05 | storage | Mechanical Engineering | 🟡 | A queda para adaptador em memória muda a durabilidade sem mudar o contrato: `mode()` existe, mas nada obriga o chamador a olhar. O sistema segue funcionando e perdendo tudo a cada recarga |
 | MEC-06 | event-store | Mechanical Engineering | 🟡 | `appendFile` não garante atomicidade em sistema de arquivos de rede, nem para linhas curtas. O desenho tolera apenas disco local |
+
+## Iteração 3 — V(3)
+
+Terceira e última passagem, contra V(3), mirando os sete mecanismos que V(3) introduziu:
+`fsync`, fila de escrita, trava de arquivo, `epoch`, índice em memória, `commit` e o contador
+de `seq` em `meta`.
+
+| id | module | lens | severity | description |
+|------|--------|----------|----------|-------------|
+| ASS-12 | storage | Assumptions | 🔴 | A marca d'água de leitura vive em `meta`, que agora sobrevive ao esvaziamento do store `events` — exatamente a separação que consertou ASS-08. Se `events` for limpo e `meta` não, o cliente tem log vazio e marca d'água dizendo "já li tudo": **nunca repuxa**, e fica com estado silenciosamente zerado enquanto o servidor guarda a história inteira. O usuário revê tudo de novo, e o conserto de um crítico abriu o outro |
+| ASS-13 | sync | Assumptions | 🔴 | A troca de `epoch` zera a marca d'água de **leitura** e não a de **escrita**. Depois de o servidor ser restaurado de um backup, os eventos que este cliente já havia enviado sumiram de lá — e a marca d'água de escrita diz "entregues", então nunca são reenviados. Revisões perdidas no remoto de forma permanente, que é o critério 2 do I3 |
+| ASS-14 | event-store | Assumptions | 🟡 | O índice em memória supõe que o arquivo inteiro cabe na memória. A-6 põe teto no cliente; nada põe teto no servidor, que acumula os eventos de **todas** as réplicas |
+| ARQ-07 | session | Architectural | 🟡 | `commit(s, evento)` melhora a garantia mas não a fecha: nada impede comprometer um evento que não corresponde ao cartão corrente, ou um rascunho velho depois de `open` ter rodado de novo. Fecharia se o `ReviewDraft` carregasse um token opaco que `commit` conferisse |
+| IMP-07 | app | Implementability | 🟡 | A sequência de arranque foi escrita; o **caminho de falha dela** não. Deck malformado, `parse` que lança, `versionOf` sobre deck vazio — nenhum tem resposta declarada |
+| SEC-09 | storage | Security | 🟡 | `ingest` grava verbatim, inclusive um evento que reivindique o **nosso próprio** `replicaId` com `seq` à frente do nosso contador. O `append` seguinte alcança esse `seq`, colide, e a união descarta um dos dois. Exige servidor hostil ou defeituoso — que é justamente o resíduo aceito em SEC-01 |
+| SEC-10 | server | Security | 🟡 | Aceitar `Sec-Fetch-Site: same-origin` como alternativa ao `Origin` resolve o caso do navegador e não vale para cliente não-navegador, que pode mandar o cabeçalho à vontade. A correção de SEC-08 fechou para quem já estava fechado |
+| PERF-06 | sync | Performance | 🟡 | Nada declara que `push` agrupa eventos. Sincronizar depois de cada nota dá **um `fsync` por revisão** — o pior caso do mecanismo que V(3) introduziu, e a amortização por lote que o justificou não acontece |
+| PERF-07 | event-store | Performance | 🟢 | O log fica duas vezes na memória: o vetor de eventos e o índice por `eventId` |
+| RES-08 | event-store | Resilience | 🟡 | `fsync` no arquivo não torna durável a **entrada de diretório** de um arquivo recém-criado. Na primeira execução, uma queda pode fazer o arquivo inteiro desaparecer mesmo depois de o `append` ter respondido |
+| RES-09 | event-store | Resilience | 🟡 | A trava `server.lock` com `O_EXCL` sobrevive a um `kill -9`: o servidor fica permanentemente impedido de arrancar, e nada declara como limpá-la nem como distinguir trava viva de trava órfã |
+| MIG-05 | service-worker | Migration / Coexistence | 🟡 | Remover `skipWaiting` levou junto o `clients.claim`: na **primeira** visita o service worker instala mas não controla a página, então a partida a frio offline só passa a valer a partir da **segunda** carga online. A premissa A-1 diz "primeira carga online" e ficou desatualizada — são duas |
+| UX-06 | ui | UI/UX | 🟡 | A interface acumulou quatro estados ambientes — armazenamento volátil, nova versão disponível, estado de sincronização, sessão vazia — e nada declara a precedência entre eles. Quatro faixas simultâneas é um resultado possível |
+| UX-07 | ui | UI/UX | 🟢 | Não está declarado o que acontece se o usuário ignorar o aviso de nova versão: o correto é seguir revisando na versão velha, mas isso precisa estar escrito |
+| PRO-05 | app | Process / Workflow | 🟡 | Com `grade` e `commit` separados, **o que acontece quando o `append` falha** não está declarado: a sessão fica parada no mesmo cartão, e o usuário precisa saber que a nota não foi registrada |
+| GOV-04 | event-store | Governance / Accountability | 🟢 | `health()` não é exposto por HTTP: o operador só enxerga a saúde do log de dentro do processo |
+| CTL-05 | sync | Control Engineering | 🟢 | O repuxão completo depois de uma troca de `epoch` acontece de uma vez, sem realimentação de progresso — e é justamente a situação em que há mais para trazer |
+| LIN-09 | event-store | Linguistics / Grammar | 🟡 | `after` devolve `epoch` e `append` não. Um cliente que só empurra nunca detecta a restauração do servidor — e é ele quem tem eventos a reenviar |
+| LIN-10 | storage | Linguistics / Grammar | 🟡 | duplica: LIN-08 — `ingest(events) -> Promise<number>` não diz número de quê: recebidos, novos, ou rejeitados |
+| OBS-05 | storage | Observability / Operability | 🟢 | O servidor ganhou `health()`; o cliente não tem equivalente, e `diag()` teria de alcançar o interior de `storage` para montar o mesmo quadro |
+| REG-05 | server | Regulatory | 🟢 | A instalabilidade exigida pela §1 depende de `manifest.webmanifest` ser servido com o tipo MIME correto pela allowlist de estáticos; nada declara os tipos |
+| MEC-07 | event-store | Mechanical Engineering | 🟡 | Em macOS, `fsync` **não** esvazia o cache do disco — exige `F_FULLFSYNC`. A durabilidade que A-17 promete é mais fraca do que o texto diz, e num sistema operacional inteiro |
