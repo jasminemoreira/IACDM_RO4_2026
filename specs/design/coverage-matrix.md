@@ -67,3 +67,44 @@ nunca "este desenho é bom?".
 | MEC-02 | scheduler | Mechanical Engineering | 🟡 | `EF` acumula em ponto flutuante: a mesma sequência dá 2.4600000000000004, não 2.46. A igualdade entre réplicas só se sustenta se a sequência for idêntica **e** nada arredondar no caminho — um `toFixed` na serialização quebra a convergência sem que nada acuse |
 | MEC-03 | deck | Mechanical Engineering | 🟡 | duplica: MIG-03 — o hash depende da serialização exata; dois produtores do mesmo deck com espaçamento ou ordem de chaves diferentes geram versões diferentes para conteúdo idêntico |
 | MEC-04 | server | Mechanical Engineering | 🟡 | A pilha depende de Node com remoção nativa de tipos (≥ 22.6, estável a partir da 23.6) e a verificação foi feita na 24.13. Nada declara essa faixa: na Node 20 o projeto inteiro não roda, com erro de sintaxe incompreensível |
+
+## Iteração 2 — V(2)
+
+Segunda passagem, contra a arquitetura revisada. Foco nos quatro mecanismos que V(2)
+introduziu e que nenhuma lente tinha visto — alocação atômica de `seq`, cursor `sseq`, JSONL,
+inversão de dependência — e reexame de tudo o mais.
+
+| id | module | lens | severity | description |
+|------|--------|----------|----------|-------------|
+| ASS-07 | storage | Assumptions | 🔴 | O contrato de V(2) tem `append(draft)` para evento local e **nenhum caminho para gravar evento vindo do remoto**. `sync` puxa eventos e não tem onde pô-los; usar `append` recarimbaria identidade alheia com `seq` local, destruindo o `eventId` de origem. O log deixa de ser a união que a reconciliação pressupõe |
+| ASS-08 | storage | Assumptions | 🔴 | `seq` vem do `autoIncrement` do store, que **reinicia em 1** se o store for recriado (limpeza, `onupgradeneeded` que apague, despejo parcial). Com o mesmo `replicaId` preservado em `meta`, os eventos novos nascem com `eventId` já usados — e `review-log.merge`, que deduplica por `eventId`, **descarta os novos em silêncio**. A premissa A-5 garante unicidade do `replicaId`, nunca a do par `(replicaId, seq)` ao longo do tempo |
+| ASS-09 | sync | Assumptions | 🟡 | Supõe que o `sseq` do servidor nunca retrocede. Restaurar o arquivo de um backup mais velho deixa todo cliente com marca d'água à frente do servidor: os eventos reemitidos nunca mais são puxados |
+| ASS-10 | app | Assumptions | 🟡 | O caminho de exceção criado para A-1 não distingue "primeira carga sem rede" de "falha de rede qualquer" — a mesma tela para duas situações com saídas diferentes |
+| ASS-11 | event-store | Assumptions | 🟡 | Supõe processo único. Duas instâncias do servidor sobre o mesmo arquivo intercalam appends e atribuem `sseq` duplicado, sem que nada detecte |
+| ARQ-05 | event-store | Architectural | 🟡 | `event-store` depende de `review-log`, que é módulo do núcleo do navegador. O servidor passa a importar código do cliente e a fronteira de implantação — o que é servido e o que roda em Node — não está declarada em lugar nenhum |
+| ARQ-06 | session | Architectural | 🟡 | A correção de IMP-03 é **prosa, não estrutura**: `grade(s,q,at)` já devolve a sessão avançada, então nada no contrato impede renderizar antes do `append` confirmado. Estruturalmente resolvido seria separar `grade -> draft` de `commit(session, evento) -> session`, tornando impossível avançar sem o evento gravado |
+| IMP-05 | app | Implementability | 🟡 | Os `Ports` foram enumerados, mas a **sequência de arranque** (carregar deck → conferir versão → dobrar log → abrir sessão → montar interface) não está escrita. Codificar `app` numa sessão dedicada ainda exige inventá-la |
+| IMP-06 | event-store | Implementability | 🟡 | Módulo novo sem contrato de erro: não está dito o que `append` devolve com disco cheio, arquivo sem permissão ou diretório inexistente |
+| SCI-03 | deck | Scientific | 🟡 | FNV-1a entrou em V(2) **sem fonte citada**, violando a regra do próprio projeto — nenhum algoritmo sem referência verificável. É exatamente o tipo de troca plausível que a regra existe para pegar |
+| SEC-06 | event-store | Security | 🟡 | O contrato não declara que o servidor **re-serializa** o evento antes de gravar. Ecoar bytes do cliente na linha do JSONL permite quebrar o enquadramento e injetar registros |
+| SEC-07 | event-store | Security | 🟡 | duplica: SEC-01 — nada impede um cliente de forjar o `replicaId` de outro aparelho e injetar eventos atribuídos a ele |
+| SEC-08 | server | Security | 🟡 | A verificação de `Origin` não decide o caso sem cabeçalho: navegações e clientes não-navegador não enviam `Origin`. Rejeitar quebra o app; aceitar reabre o buraco que SEC-01 fechou |
+| PERF-04 | event-store | Performance | 🟡 | `after(sseq)` sobre JSONL varre o arquivo desde o início a cada sincronização. Sem índice, o custo de puxar nada cresce com todo o histórico |
+| PERF-05 | app | Performance | 🟡 | A nota aplica `applyOne` incremental sobre o estado corrente; se uma sincronização estiver em voo e trouxer eventos com `at` anterior, o incremento fica sobre base que a fusão invalida |
+| REG-04 | event-store | Regulatory | 🟢 | O critério 3 do I3 (cenário reproduzível) agora envolve dois processos, e nenhum módulo declara o roteiro executável que o encena |
+| RES-05 | sync | Resilience | 🟡 | Não está declarada a ordem entre gravar os eventos puxados e avançar a marca d'água. Gravar depois de avançar perde tudo o que estava em voo numa queda |
+| RES-06 | event-store | Resilience | 🔴 | `appendFile` sem `fsync`: o servidor responde `{stored: [...]}`, o cliente avança a marca d'água e **nunca reenvia** — mas o dado ainda está no buffer do sistema. Uma queda de energia apaga eventos que o cliente considera entregues, e ninguém os reenvia. É perda de revisão pela porta que V(2) abriu ao tornar o `stored` autoritativo |
+| RES-07 | event-store | Resilience | 🟡 | Duas chamadas de `appendFile` em voo no mesmo processo podem intercalar escritas acima do tamanho atômico do sistema, corrompendo linhas no **meio** do arquivo — não só a última. Falta declarar fila serializada de escrita |
+| UX-05 | ui | UI/UX | 🟡 | `render(viewModel)` redesenha tudo: o foco de teclado e o estado "revelado" se perdem a cada quadro, justamente no gesto que se repete dezenas de vezes por sessão |
+| MIG-04 | service-worker | Migration / Coexistence | 🟡 | `skipWaiting` + `clients.claim` trocam o service worker **sob uma página em execução**: o JS velho continua rodando e passa a buscar recursos do cache novo. A correção de MIG-02 criou a janela de incompatibilidade clássica |
+| SUS-03 | event-store | Sustainability / Proportionality | 🟢 | O arquivo do servidor cresce para sempre, como o log do cliente. A decisão de não compactar, aceita para o cliente, agora vale em dois lugares e nenhum deles a mede |
+| PRO-04 | app | Process / Workflow | 🟡 | A versão do deck passa a ser conferida só no arranque (correção de PRO-02), o que deixa sem resposta a aba aberta por dias: a troca de versão no meio da vida da página não tem caminho declarado |
+| GOV-03 | event-store | Governance / Accountability | 🟢 | `sseq` é atribuído pelo servidor e o cliente não tem como auditá-lo: não há prova, do lado de quem enviou, de que um evento foi mesmo aceito e ordenado |
+| OBS-04 | event-store | Observability / Operability | 🟡 | A linha truncada é descartada **em silêncio** na leitura. O arquivo perde conteúdo e nada registra que perdeu — a única evidência some junto com o dado |
+| CTL-04 | sync | Control Engineering | 🟢 | A decisão de não repetir automaticamente (correção de RES-01) deixa o sistema sem laço fechado: se o usuário nunca acionar a sincronização, as pendências crescem sem realimentação alguma |
+| LIN-05 | ui | Linguistics / Grammar | 🟡 | `ViewModel` é nomeado no contrato de `ui` e nunca declarado. Sem ele, `ui` e `app` não podem ser construídos em sessões separadas — que é a razão de a inversão de dependência ter sido feita |
+| LIN-06 | sync | Linguistics / Grammar | 🟡 | duplica: LIN-05 — `SyncReport` nomeado no contrato e não declarado |
+| LIN-07 | app | Linguistics / Grammar | 🟡 | duplica: LIN-05 — `Diagnostico` nomeado no contrato e não declarado |
+| LIN-08 | event-store | Linguistics / Grammar | 🟡 | `append(events) -> {stored}` não diz se `stored` inclui os eventos **já conhecidos** (deduplicados) ou só os novos. O cliente precisa dos dois casos como "entregue" para avançar a marca d'água; a leitura errada faz reenviar para sempre |
+| MEC-05 | storage | Mechanical Engineering | 🟡 | A queda para adaptador em memória muda a durabilidade sem mudar o contrato: `mode()` existe, mas nada obriga o chamador a olhar. O sistema segue funcionando e perdendo tudo a cada recarga |
+| MEC-06 | event-store | Mechanical Engineering | 🟡 | `appendFile` não garante atomicidade em sistema de arquivos de rede, nem para linhas curtas. O desenho tolera apenas disco local |
