@@ -1,4 +1,5 @@
 import { DECK_PADRAO, carregarDeck } from '../deck/index.js';
+import { registrarServiceWorker } from '../pwa/index.js';
 import { ehNota } from '../scheduler/index.js';
 import { abrirProgresso, depositoPadrao, gravarProgresso } from '../storage/index.js';
 import type { Deposito } from '../storage/index.js';
@@ -126,6 +127,9 @@ async function montar(raiz: HTMLElement, deposito: Deposito): Promise<void> {
   estado = await abrir(deckPedido());
   desenhar();
 }
+
+// O worker só existe no build de produção; em desenvolvimento não há o que registrar.
+if (import.meta.env.PROD) void registrarServiceWorker();
 
 const raiz = document.getElementById('app');
 if (raiz === null) throw new Error('elemento #app não encontrado');
