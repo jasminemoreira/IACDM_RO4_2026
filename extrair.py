@@ -47,6 +47,27 @@ lugar dela: a DV registrada no §1 do LOG-OPERACAO.md não muda.
 definição (só conta commits > t0). Vai separado para não esconder o caso em que o
 commit que abre o incremento já mexe no que veio antes.
 
+CHURN RETROATIVO DE LINHA (secundário, candidato a DV)
+------------------------------------------------------
+`M`, `E` e `I` medem a SUPERFÍCIE do módulo. No braço A, uma reescrita de 176 linhas
+do modelo de persistência produziu UM símbolo a menos — troca de modelo interno com
+interface estável é invisível à DV registrada (LOG-OPERACAO.md §3e).
+
+    linhas removidas ou alteradas, sob src/, em arquivo que JÁ EXISTIA no aceite do
+    incremento anterior; exclui teste e exclui arquivo criado no próprio incremento
+
+Cobre o incremento INTEIRO, não a janela pós-t0: o achado do §3e é que o retrabalho
+cai no PRÓPRIO t0 — refatora-se para abrir espaço, depois constrói-se — e a janela da
+primária o exclui por definição.
+
+Renomear ou mover arquivo NÃO conta aqui: o git detecta renomeação e reporta 0/0.
+Quem pega renomeação de módulo é a medida de interface, onde ela vale ΔM + ΔE + ΔI.
+As duas secundárias são complementares, não redundantes — no histórico sintético do
+§3c a renomeação de módulo dá interface=4 e linha=1.
+
+Linha alterada conta como removida: o numstat do git dá 1 remoção + 1 adição para
+cada linha modificada, e é a remoção que marca desfazer o que estava lá.
+
 |ΔX| é a cardinalidade da DIFERENÇA SIMÉTRICA entre commits consecutivos, não a
 variação de tamanho. Renomear um módulo é churn 2, não 0 — é a leitura que mede
 retrabalho arquitetural, que é o que a DV quer. A variação líquida vai junto no
@@ -236,6 +257,34 @@ def toca_codigo(repo, sha, pai):
     return False
 
 
+def churn_linha(repo, base_sha, commits_inc):
+    """Linhas desfeitas em arquivo pré-existente. Ver cabeçalho."""
+    if base_sha is None:
+        return 0, []
+    saida = git(repo, "ls-tree", "-r", "--name-only", base_sha, "--", "src")
+    existiam = set(saida.split())
+    total, detalhe = 0, []
+    for c in commits_inc:
+        num = git(repo, "diff", "--numstat", f"{c['sha']}~1..{c['sha']}", "--", "src")
+        dels, arqs = 0, []
+        for linha in num.strip().split("\n"):
+            if not linha:
+                continue
+            _add, rem, path = linha.split("\t")
+            if path not in existiam or ".test." in path:
+                continue
+            if PurePosixPath(path).suffix not in CODIGO:
+                continue
+            if rem.isdigit() and int(rem):
+                dels += int(rem)
+                arqs.append(f"{path[4:]}(-{rem})")
+        if dels:
+            total += dels
+            detalhe.append({"sha": c["sha"][:8], "assunto": c["assunto"],
+                            "linhas": dels, "arquivos": arqs})
+    return total, detalhe
+
+
 def incrementos(repo, hist):
     """Fatia o histórico pelas tags inc<k>-fim. Falha alto se faltarem."""
     tags = git(repo, "tag", "--list", "inc*-fim").split()
@@ -312,7 +361,10 @@ def analisar(repo):
                 "primeiro_do_repo": cs[t0_idx]["sha"] == hist[0]["sha"],
             },
             "churn": 0, "churn_retroativo": 0, "retro_em_t0": 0, "por_commit": [],
+            "churn_linha": 0, "linha_por_commit": [],
         }
+        base_sha = None if idx_inc == 0 else incs[idx_inc - 1]["commits"][-1]["sha"]
+        item["churn_linha"], item["linha_por_commit"] = churn_linha(repo, base_sha, cs)
 
         def retro(ant, cur):
             return (len((cur["M"] ^ ant["M"]) & base["M"])
@@ -364,6 +416,7 @@ def analisar(repo):
         "churn_retroativo": churn_retro,
         "churn_retroativo_normalizado": None if denom == 0 else round(churn_retro / denom, 4),
         "retro_em_t0": retro_em_t0_total,
+        "churn_linha_retroativo": sum(i["churn_linha"] for i in detalhe),
         "imports_relativos_nao_resolvidos": sorted(set(nao_resolvidos)),
     }
 
@@ -377,8 +430,8 @@ def tabela(r):
              f"denominador={f['denominador']}  LOC={f['loc']}")
     L.append(f"módulos: {', '.join(f['M']) or '(nenhum)'}")
     L.append("")
-    L.append("inc  commits  t0 (posição)      churn pós-t0   retroativo")
-    L.append("---  -------  ----------------  ------------   ----------")
+    L.append("inc  commits  t0 (posição)      churn pós-t0   retro-interface   retro-linha")
+    L.append("---  -------  ----------------  ------------   ---------------   -----------")
     for i in r["incrementos"]:
         if i["t0"] is None:
             t0 = "não localizável"
@@ -389,7 +442,7 @@ def tabela(r):
         marca = " *" if i["sem_tag"] else ""
         r_t0 = f"  (+{i['retro_em_t0']} em t0)" if i["retro_em_t0"] else ""
         L.append(f"{i['k']}{marca:2}  {i['n_commits']:7}  {t0:16}  {i['churn']:12}   "
-                 f"{i['churn_retroativo']:10}{r_t0}")
+                 f"{i['churn_retroativo']:10}{r_t0:14}   {i['churn_linha']:11}")
     if any(i["sem_tag"] for i in r["incrementos"]):
         L.append("*  sem tag de aceite — commits após a última tag")
     L.append("")
@@ -398,6 +451,8 @@ def tabela(r):
     L.append(f"churn líquido (alt) : {r['churn_liquido']}")
     L.append(f"churn retroativo    : {r['churn_retroativo']}  "
              f"(normalizado {r['churn_retroativo_normalizado']})")
+    L.append(f"retro de linha      : {r['churn_linha_retroativo']}  "
+             f"(LOC final {r['final']['loc']})")
     if r["retro_em_t0"]:
         L.append(f"  + {r['retro_em_t0']} no próprio t0, fora da janela da primária")
     if r["imports_relativos_nao_resolvidos"]:
@@ -405,6 +460,12 @@ def tabela(r):
         L.append("ATENÇÃO — imports relativos não resolvidos (E pode estar subcontada):")
         for x in r["imports_relativos_nao_resolvidos"][:20]:
             L.append(f"  {x}")
+    for i in r["incrementos"]:
+        if i["linha_por_commit"]:
+            L.append("")
+            L.append(f"incremento {i['k']} — linhas desfeitas em arquivo pré-existente:")
+            for c in i["linha_por_commit"]:
+                L.append(f"  {c['sha']}  -{c['linhas']:<4} {' '.join(c['arquivos'])[:70]}")
     for i in r["incrementos"]:
         if i["por_commit"]:
             L.append("")
