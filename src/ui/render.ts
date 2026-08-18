@@ -36,7 +36,9 @@ function telaRevisao(
   barra.append(trilho);
 
   const cartao = elemento('section', 'cartao');
-  cartao.append(elemento('p', 'cartao__hanzi', visao.cartao.hanzi));
+  const hanzi = elemento('p', 'cartao__hanzi', visao.cartao.hanzi);
+  hanzi.lang = 'zh-Hans'; // deixa o navegador escolher a forma regional certa do glifo
+  cartao.append(hanzi);
 
   if (visao.revelado) {
     cartao.append(

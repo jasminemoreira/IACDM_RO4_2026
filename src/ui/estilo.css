@@ -7,6 +7,9 @@
   --destaque: #7aa2ff;
   --acerto: #58c98a;
   --erro: #e0715f;
+  /* Pilha CJK: o glifo de 汉字 varia por região, então pedimos famílias chinesas. */
+  --fonte-hanzi: "Noto Sans SC", "Source Han Sans SC", "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", "WenQuanYi Micro Hei", sans-serif;
   color-scheme: dark light;
 }
 
@@ -62,6 +65,7 @@ body {
 
 .cartao__hanzi {
   margin: 0;
+  font-family: var(--fonte-hanzi);
   font-size: 4.5rem;
   line-height: 1.15;
   font-weight: 500;
