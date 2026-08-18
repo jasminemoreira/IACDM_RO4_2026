@@ -32,6 +32,14 @@ viés de ordem que a operadora pode remover sem custo.
 | A — direto | `hanzi-pwa-w1/` | `braco-A` | 2026-08-18 | — |
 | C — processo exigível | `hanzi-pwa-w2/` | `braco-C` | — | — |
 
+Fronteiras de incremento do braço A, marcadas pela coordenação no commit em que a
+operadora declarou o aceite:
+
+| inc | tag | commit | data | commits | `t₀` |
+|---|---|---|---|---|---|
+| 1 | `inc1-fim` | `9cf6095` | 2026-08-18 | 11 | `5952cdc`, posição 4/11 |
+| 2 | `inc2-fim` | `779fcb3` | 2026-08-18 | 5 | `be2c0ef`, posição 1/5 |
+
 ## 3. Decisões de montagem — coordenação, antes do início
 
 | data | decisão | motivo |
