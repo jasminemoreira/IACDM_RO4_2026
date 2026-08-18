@@ -41,6 +41,12 @@ operadora declarou o aceite:
 | 2 | `inc2-fim` | `779fcb3` | 2026-08-18 | 5 | `be2c0ef`, posição 1/5 |
 | 3 | `inc3-fim` | `e6fe2dc` | 2026-08-18 | 6 | `be4ddfc`, posição 1/6 |
 
+Braço C:
+
+| inc | tag | commit | data | commits | `t₀` |
+|---|---|---|---|---|---|
+| 1 | `inc1-fim` | `206604d` | 2026-08-18 | 16 | `321fa56`, posição **15/16** |
+
 ## 3. Decisões de montagem — coordenação, antes do início
 
 | data | decisão | motivo |
@@ -231,12 +237,35 @@ congelada (alvo de entrega, lapso `q<3`, migração de deck, política de pesqui
 genuína** (o remoto), que a especificação delega de propósito. A batelada válida pode tirar o
 humano de quatro dos cinco pontos — e deveria fechar o quinto no congelamento.
 
+## 4b. Granularidade de commit — assimetria entre os braços
+
+O §7 do `REQUISITOS.md` (congelado, idêntico nos dois braços) exige *"comitar a cada passo com
+significado próprio; não agrupar um incremento inteiro num único commit"*.
+
+| | braço A, inc 1 | braço C, inc 1 |
+|---|---|---|
+| commits no incremento | 11 | 16 |
+| commits **com código** | 8 | **2** (861 e 976 linhas) |
+| `t₀` | 4/11 | **15/16** |
+| janela pós-`t₀` | 7 commits | **1 commit** |
+
+O braço C cumpre a exigência para os artefatos de fase (12 commits de `specs/`) e não a cumpre
+para o código. Consequência sobre a medição, não sobre o produto: a DV primária é computada
+**por commit**, e uma janela de um único commit não tem como exibir churn — o incremento inteiro
+chega como estado final. Não é ausência de retrabalho: é ausência de granularidade para observá-lo.
+
+Isto torna os braços não comparáveis na primária por um motivo que nada tem a ver com método:
+a mesma quantidade de retrabalho produz números diferentes conforme o tamanho do commit.
+Corresponde à linha REDESENHO do §7 do `PILOTO.md` — *"granularidade de commit como exigência"* —
+e a exigência já está na especificação congelada; o que falta é ela ser operada.
+
 ## 5. Descartes e intervenções
 
 Todo descarte e toda intervenção, nos dois braços, no ato.
 
 | data | braço | o quê | motivo |
 |---|---|---|---|
+| 2026-08-18 18:25 | C | **`git fetch` dentro do braço C trouxe `origin/braco-A`, `origin/coordenacao` e as três tags do braço A para dentro do repositório** | exposição do braço C ao histórico completo do braço A e ao `PILOTO.md` — hipótese, braço esperado, local do efeito — por `git show origin/coordenacao:PILOTO.md`. **Cronologia:** último commit do incremento 1 às 18:21:11, fetch às 18:25:58; o incremento 1 foi construído antes de a exposição existir. **Contenção imediata:** tags removidas, refs `braco-A` e `coordenacao` apagadas, `git gc --prune=now` (os objetos já não existem no braço C), e `remote.origin.fetch` restrito a `braco-C`. Evidência preservada fora do braço (`FETCH_HEAD` e reflog). **Detectável: o acesso. Não detectável: a leitura.** Autoria do fetch — sessão ou operadora — em apuração |
 | 2026-08-18 | coordenação | a coordenação comentou o **mérito** das opções de G0 antes da submissão (escopo da pesquisa, escolha do remoto) e propôs substituir a discrição por um conjunto de regras derivadas da especificação | **intervenção no tratamento, registrada como tal.** Partiu de quem leu o `PILOTO.md` e conhece a hipótese, o braço esperado e o local do efeito — a pior origem possível. A operadora determinou que a coordenação não interrompa e que a operação siga a critério dela, o que é a leitura correta do §5: os *gates* decidem e a discrição é dado a registrar, não variável a corrigir. A partir daqui a coordenação **registra e mede, não opina sobre mérito**. O que já foi dito não se desfaz e fica no registro para quem ler o dado |
 | 2026-08-18 | C | `init_project` chamado à mão pela operadora **antes** do `start`, com `projectName` "Chinese Xpress" e descrição "App de aprendizado de chinês" | desvio do roteiro, **sem efeito sobre o dado**: o estado ficou em Fase 0, iteração 1, com `decisions`, `activatedLenses`, `exitCriteria` e `projectSpec` vazios — exatamente onde o `start` pararia. O hook de `SessionStart` prevê o caminho (*greenfield: ask the user for a project name and description, then call init_project directly*), então a operadora fez à mão o que a sessão faria ao perguntar. Nome e descrição são entrada da operadora nos dois caminhos. Efeitos colaterais comitados em `94f3cef`+1 antes de qualquer código: hooks `PreCompact`/`SessionStart` no `settings.json` e `specs/README.md` |
 | 2026-08-18 | C | `versus-claude` 0.16.3 instalado por `preparar-braco-c.py`, commit `94f3cef`, antes de qualquer código | provenance do instrumento no próprio histórico do braço, como o `REQUISITOS.md` é para a especificação. `.versus/state.json` fica fora do commit (muda a cada chamada de ferramenta) e será arquivado no repositório de coordenação ao fim do braço |
