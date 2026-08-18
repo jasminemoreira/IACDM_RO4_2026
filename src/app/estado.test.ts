@@ -3,6 +3,7 @@ import { carregarDeck } from '../deck/index.js';
 import type { DeckIdentificado } from '../deck/index.js';
 import { MS_POR_DIA } from '../scheduler/index.js';
 import { migrarParaDeck } from '../storage/index.js';
+import { projetar } from '../sync/index.js';
 import type { EstadoApp } from './estado.js';
 import {
   avisoDeMigracao,
@@ -21,7 +22,12 @@ const v1 = carregarDeck('exemplo');
 const v2 = carregarDeck('exemplo-v2');
 
 function novoEstado(deck: DeckIdentificado = v1, agora = T0): EstadoApp {
-  return iniciar({ deck, persistido: migrarParaDeck(null, deck, agora).estado, agora });
+  return iniciar({
+    deck,
+    dispositivo: 'disp',
+    persistido: migrarParaDeck(null, deck, agora).estado,
+    agora,
+  });
 }
 
 describe('visaoDe', () => {
@@ -105,6 +111,7 @@ describe('telaDe', () => {
   it('marca a ausência de persistência', () => {
     const estado = iniciar({
       deck: v1,
+      dispositivo: 'disp',
       persistido: migrarParaDeck(null, v1, T0).estado,
       agora: T0,
       persistente: false,
@@ -113,14 +120,52 @@ describe('telaDe', () => {
   });
 });
 
+describe('registro das revisões no log', () => {
+  it('cada nota vira um fato assinado por este dispositivo', () => {
+    const estado = responder(responder(novoEstado(), 5, T0), 3, T0 + 1);
+
+    expect(estado.persistido.log).toEqual([
+      { id: 'disp-1', dispositivo: 'disp', cartaoId: 'c001', q: 5, em: T0 },
+      { id: 'disp-2', dispositivo: 'disp', cartaoId: 'c002', q: 3, em: T0 + 1 },
+    ]);
+  });
+
+  it('o log dobrado reproduz o progresso da sessão', () => {
+    let estado = novoEstado();
+    for (const q of [5, 0, 4, 3] as const) estado = responder(estado, q, T0);
+
+    expect(projetar([], estado.persistido.log, v1.cartoes)).toEqual(estado.sessao.progresso);
+  });
+
+  it('não registra nada depois do fim da sessão', () => {
+    let estado = novoEstado();
+    for (let i = 0; i < 12; i += 1) estado = responder(estado, 5, T0);
+    const noFim = responder(estado, 5, T0);
+
+    expect(noFim).toBe(estado);
+    expect(noFim.persistido.log).toHaveLength(12);
+  });
+});
+
 describe('avisoDeMigracao', () => {
   it('cala quando não houve troca de versão', () => {
     expect(avisoDeMigracao(migrarParaDeck(null, v1, T0).relatorio)).toBeNull();
   });
 
+  it('trata todo cartão como novo quando ainda não há revisão alguma', () => {
+    const semHistorico = migrarParaDeck(null, v1, T0).estado;
+    const aviso = avisoDeMigracao(migrarParaDeck(semHistorico, v2, T0).relatorio);
+
+    expect(aviso).toContain('0 com progresso preservado');
+    expect(aviso).toContain('13 novo(s)');
+  });
+
   it('resume o que a troca de versão fez com o progresso', () => {
-    const anterior = migrarParaDeck(null, v1, T0).estado;
-    const aviso = avisoDeMigracao(migrarParaDeck(anterior, v2, T0).relatorio);
+    // uma sessão inteira revisada na v1, para que todos os cartões tenham histórico
+    let estado = novoEstado();
+    for (let i = 0; i < 12; i += 1) estado = responder(estado, 5, T0 + i);
+
+    const aviso = avisoDeMigracao(migrarParaDeck(estado.persistido, v2, T0 + 100).relatorio);
 
     expect(aviso).toContain('11 com progresso preservado');
     expect(aviso).toContain('2 novo(s)');

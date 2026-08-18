@@ -11,11 +11,14 @@ import {
 } from '../session/index.js';
 import type { EstadoPersistido, RelatorioMigracao } from '../storage/index.js';
 import { progressoDe } from '../storage/index.js';
+import { novaRevisao } from '../sync/index.js';
 import type { LinhaResumo, OpcaoDeck, Tela, Visao } from '../ui/index.js';
 
 /** Estado completo da aplicação. */
 export interface EstadoApp {
   readonly deck: DeckIdentificado;
+  /** Identificador desta instalação; é quem assina as revisões registradas. */
+  readonly dispositivo: string;
   readonly persistido: EstadoPersistido;
   readonly sessao: Sessao;
   readonly revelado: boolean;
@@ -26,6 +29,7 @@ export interface EstadoApp {
 
 export interface OpcoesInicio {
   readonly deck: DeckIdentificado;
+  readonly dispositivo: string;
   readonly persistido: EstadoPersistido;
   readonly agora: number;
   readonly aviso?: string | null;
@@ -36,6 +40,7 @@ export interface OpcoesInicio {
 export function iniciar(opcoes: OpcoesInicio): EstadoApp {
   return {
     deck: opcoes.deck,
+    dispositivo: opcoes.dispositivo,
     persistido: opcoes.persistido,
     sessao: iniciarSessao(opcoes.deck.cartoes, progressoDe(opcoes.persistido), opcoes.agora),
     revelado: false,
@@ -49,10 +54,22 @@ export function revelar(estado: EstadoApp): EstadoApp {
   return estado.revelado ? estado : { ...estado, revelado: true };
 }
 
-/** Registra a nota do cartão atual e volta a esconder a resposta. */
+/**
+ * Registra a nota do cartão atual.
+ *
+ * A nota vira um fato no log — que é o que se persiste e se sincroniza — e a
+ * sessão avança. As duas contas são a mesma: dobrar o log reproduz exatamente
+ * o progresso que a sessão calculou, e há teste para isso.
+ */
 export function responder(estado: EstadoApp, q: Nota, agora: number): EstadoApp {
+  const cartao = cartaoAtual(estado.sessao);
+  if (cartao === null) return estado;
+
+  const revisao = novaRevisao(estado.persistido.log, estado.dispositivo, cartao.id, q, agora);
+
   return {
     ...estado,
+    persistido: { ...estado.persistido, log: [...estado.persistido.log, revisao] },
     sessao: responderSessao(estado.sessao, q, agora),
     revelado: false,
   };

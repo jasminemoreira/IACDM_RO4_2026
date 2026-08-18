@@ -1,7 +1,7 @@
 import type { DeckIdentificado } from '../deck/index.js';
-import type { EstadoCartao } from '../scheduler/index.js';
-import { estadoInicial } from '../scheduler/index.js';
 import type { Progresso } from '../session/index.js';
+import type { Revisao } from '../sync/index.js';
+import { projetar } from '../sync/index.js';
 import type { Deposito } from './deposito.js';
 import type { RelatorioMigracao } from './migracao.js';
 import { migrarParaDeck } from './migracao.js';
@@ -9,6 +9,7 @@ import type { EstadoPersistido } from './modelo.js';
 import { VERSAO_MODELO, parseEstadoPersistido } from './modelo.js';
 
 export const CHAVE_ATUAL = 'atual';
+export const CHAVE_DISPOSITIVO = 'dispositivo';
 const PREFIXO_ILEGIVEL = 'ilegivel:';
 
 /** Resultado da abertura do progresso local. */
@@ -19,9 +20,37 @@ export interface ProgressoAberto {
   readonly aviso: string | null;
 }
 
-/** O progresso persistido, na forma que a sessão consome. */
+/** Identificador curto e estável desta instalação. */
+function novoIdentificador(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID().slice(0, 8);
+  }
+  return Math.floor(Math.random() * 0xffffffff)
+    .toString(16)
+    .padStart(8, '0');
+}
+
+/**
+ * O identificador deste dispositivo, criado na primeira abertura e guardado.
+ *
+ * Vive fora do registro de conteúdo porque é propriedade da instalação, não do
+ * deck: trocar de deck não deve trocar a identidade que assina as revisões.
+ */
+export async function identificarDispositivo(
+  deposito: Deposito,
+  gerar: () => string = novoIdentificador,
+): Promise<string> {
+  const guardado = await deposito.ler(CHAVE_DISPOSITIVO);
+  if (typeof guardado === 'string' && guardado !== '') return guardado;
+
+  const novo = gerar();
+  await deposito.escrever(CHAVE_DISPOSITIVO, novo);
+  return novo;
+}
+
+/** O progresso projetado sobre o deck vigente, na forma que a sessão consome. */
 export function progressoDe(estado: EstadoPersistido): Progresso {
-  return new Map(estado.progresso.map((e) => [e.cartaoId, e]));
+  return projetar(estado.base, estado.log, estado.deck.cartoes);
 }
 
 /**
@@ -57,22 +86,18 @@ export async function abrirProgresso(
   return { estado, relatorio, aviso };
 }
 
-/** Grava o progresso corrente preservando o deck vigente e os órfãos arquivados. */
-export async function gravarProgresso(
+/** Grava um log de revisões preservando o deck vigente e o estado herdado. */
+export async function gravarLog(
   deposito: Deposito,
   base: EstadoPersistido,
-  progresso: Progresso,
+  log: readonly Revisao[],
   agora: number,
 ): Promise<EstadoPersistido> {
-  const estados: EstadoCartao[] = base.deck.cartoes.map(
-    (cartao) => progresso.get(cartao.id) ?? estadoInicial(cartao.id),
-  );
-
   const atualizado: EstadoPersistido = {
     versaoModelo: VERSAO_MODELO,
     deck: base.deck,
-    progresso: estados,
-    orfaos: base.orfaos,
+    base: base.base,
+    log,
     atualizadoEm: agora,
   };
 

@@ -1,14 +1,20 @@
 import type { Deck } from '../deck/index.js';
 import { parseDeck } from '../deck/index.js';
 import type { EstadoCartao } from '../scheduler/index.js';
+import type { Revisao } from '../sync/index.js';
+import { parseLog } from '../sync/index.js';
 
 /**
  * Versão do **modelo de conteúdo persistido** — a forma do registro guardado
  * localmente. Independe da versão do *deck*, que é derivada do conteúdo dos
- * cartões. Ao mudar a forma deste registro, incremente aqui e registre a
- * migração correspondente em `MIGRACOES`.
+ * cartões.
+ *
+ * - **1** — guardava a dobra: `progresso` (estado SM-2 por cartão) e `orfaos`.
+ * - **2** — guarda os fatos: `log` de revisões, mais `base` com a dobra herdada
+ *   da versão 1. O Incremento 3 exigiu a mudança: reconciliar dois dispositivos
+ *   sem descartar revisões de um dos lados é impossível a partir da dobra.
  */
-export const VERSAO_MODELO = 1;
+export const VERSAO_MODELO = 2;
 
 /** O deck vigente, guardado junto do progresso para detectar troca de versão. */
 export interface DeckPersistido {
@@ -20,15 +26,16 @@ export interface DeckPersistido {
 /**
  * O registro local completo.
  *
- * `orfaos` guarda o progresso de cartões que não estão no deck vigente. Nada é
- * apagado numa troca de versão: o que sai do deck é arquivado aqui e volta
- * intacto se o cartão reaparecer.
+ * `base` só é não-vazia em instalações que vieram do modelo 1, onde os fatos
+ * originais não existem mais; o `log` é a fonte de verdade daí em diante.
+ * Nada é apagado numa troca de versão do deck: revisões de cartões que saíram
+ * continuam no log, apenas não são projetadas.
  */
 export interface EstadoPersistido {
   readonly versaoModelo: number;
   readonly deck: DeckPersistido;
-  readonly progresso: readonly EstadoCartao[];
-  readonly orfaos: readonly EstadoCartao[];
+  readonly base: readonly EstadoCartao[];
+  readonly log: readonly Revisao[];
   readonly atualizadoEm: number;
 }
 
@@ -41,12 +48,23 @@ export class ErroModeloIncompativel extends Error {
 export type Migracao = (registro: Record<string, unknown>) => Record<string, unknown>;
 
 /**
- * Migrações do modelo persistido, indexadas pela versão de origem.
+ * Do modelo 1 para o 2: a dobra que a versão 1 guardava vira o estado herdado,
+ * e o log de fatos nasce vazio.
  *
- * Vazio enquanto só existiu a versão 1. Ao criar a versão 2, registre aqui
- * `[1, (r) => ...]` — a cadeia é aplicada automaticamente na leitura.
+ * `progresso` e `orfaos` entram juntos em `base` — a distinção entre eles era
+ * "está no deck vigente ou não", que na versão 2 é respondida projetando o log
+ * sobre o deck, não guardando duas listas.
  */
-export const MIGRACOES: ReadonlyMap<number, Migracao> = new Map();
+const de1Para2: Migracao = (registro) => {
+  const progresso = Array.isArray(registro['progresso']) ? registro['progresso'] : [];
+  const orfaos = Array.isArray(registro['orfaos']) ? registro['orfaos'] : [];
+  const { progresso: _p, orfaos: _o, ...resto } = registro;
+
+  return { ...resto, base: [...progresso, ...orfaos], log: [] };
+};
+
+/** Migrações do modelo persistido, indexadas pela versão de origem. */
+export const MIGRACOES: ReadonlyMap<number, Migracao> = new Map([[1, de1Para2]]);
 
 function ehRegistro(valor: unknown): valor is Record<string, unknown> {
   return typeof valor === 'object' && valor !== null && !Array.isArray(valor);
@@ -104,7 +122,10 @@ function parseEstadoCartao(bruto: unknown, onde: string): EstadoCartao {
       throw new ErroModeloIncompativel(`${onde}: campo "${campo}" inválido`);
     }
   }
-  if (proximaRevisao !== null && (typeof proximaRevisao !== 'number' || !Number.isFinite(proximaRevisao))) {
+  if (
+    proximaRevisao !== null &&
+    (typeof proximaRevisao !== 'number' || !Number.isFinite(proximaRevisao))
+  ) {
     throw new ErroModeloIncompativel(`${onde}: proximaRevisao inválida`);
   }
 
@@ -126,10 +147,9 @@ export function parseEstadoPersistido(bruto: unknown): EstadoPersistido {
     throw new ErroModeloIncompativel('registro local sem deck identificado');
   }
 
-  const progresso = registro['progresso'];
-  const orfaos = registro['orfaos'] ?? [];
-  if (!Array.isArray(progresso) || !Array.isArray(orfaos)) {
-    throw new ErroModeloIncompativel('registro local com progresso malformado');
+  const base = registro['base'] ?? [];
+  if (!Array.isArray(base)) {
+    throw new ErroModeloIncompativel('registro local com estado herdado malformado');
   }
 
   const atualizadoEm = registro['atualizadoEm'];
@@ -141,8 +161,8 @@ export function parseEstadoPersistido(bruto: unknown): EstadoPersistido {
       versao: deck['versao'],
       cartoes: parseDeck(deck['cartoes']),
     },
-    progresso: progresso.map((e, i) => parseEstadoCartao(e, `progresso[${i}]`)),
-    orfaos: orfaos.map((e, i) => parseEstadoCartao(e, `orfaos[${i}]`)),
+    base: base.map((e, i) => parseEstadoCartao(e, `base[${i}]`)),
+    log: parseLog(registro['log'] ?? []),
     atualizadoEm: typeof atualizadoEm === 'number' ? atualizadoEm : 0,
   };
 }

@@ -12,4 +12,11 @@ export { migrarParaDeck } from './migracao.js';
 export type { Deposito } from './deposito.js';
 export { depositoIndexedDb, depositoMemoria, depositoPadrao } from './deposito.js';
 export type { ProgressoAberto } from './repositorio.js';
-export { CHAVE_ATUAL, abrirProgresso, gravarProgresso, progressoDe } from './repositorio.js';
+export {
+  CHAVE_ATUAL,
+  CHAVE_DISPOSITIVO,
+  abrirProgresso,
+  gravarLog,
+  identificarDispositivo,
+  progressoDe,
+} from './repositorio.js';

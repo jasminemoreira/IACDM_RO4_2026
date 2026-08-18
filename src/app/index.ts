@@ -1,7 +1,12 @@
 import { DECK_PADRAO, carregarDeck } from '../deck/index.js';
 import { registrarServiceWorker } from '../pwa/index.js';
 import { ehNota } from '../scheduler/index.js';
-import { abrirProgresso, depositoPadrao, gravarProgresso } from '../storage/index.js';
+import {
+  abrirProgresso,
+  depositoPadrao,
+  gravarLog,
+  identificarDispositivo,
+} from '../storage/index.js';
 import type { Deposito } from '../storage/index.js';
 import { renderizar } from '../ui/index.js';
 import type { Acoes } from '../ui/index.js';
@@ -44,6 +49,7 @@ const acoesInertes: Acoes = {
 
 async function montar(raiz: HTMLElement, deposito: Deposito): Promise<void> {
   let estado: EstadoApp;
+  const dispositivo = await identificarDispositivo(deposito);
 
   /** Carrega um deck do catálogo e migra o progresso guardado para ele. */
   async function abrir(deckId: string, avisoAnterior: string | null = null): Promise<EstadoApp> {
@@ -54,6 +60,7 @@ async function montar(raiz: HTMLElement, deposito: Deposito): Promise<void> {
     );
     return iniciar({
       deck,
+      dispositivo,
       persistido: aberto.estado,
       agora: agora(),
       aviso: avisos.length > 0 ? avisos.join(' ') : null,
@@ -74,10 +81,10 @@ async function montar(raiz: HTMLElement, deposito: Deposito): Promise<void> {
   /** Grava o progresso da sessão. Falha de gravação vira aviso, não perda de tela. */
   async function persistir(): Promise<void> {
     try {
-      const atualizado = await gravarProgresso(
+      const atualizado = await gravarLog(
         deposito,
         estado.persistido,
-        estado.sessao.progresso,
+        estado.persistido.log,
         agora(),
       );
       estado = comPersistido(estado, atualizado);
