@@ -39,6 +39,13 @@ export interface OpcaoDeck {
   readonly selecionado: boolean;
 }
 
+/** O estado da sincronização, já reduzido a texto pela camada de aplicação. */
+export interface EstadoSync {
+  readonly situacao: 'ociosa' | 'sincronizando' | 'erro';
+  /** Linha curta sobre a última tentativa; `null` antes da primeira. */
+  readonly detalhe: string | null;
+}
+
 /** Tudo o que a interface desenha: o corpo mais o cabeçalho e os avisos. */
 export interface Tela {
   readonly visao: Visao;
@@ -48,6 +55,7 @@ export interface Tela {
   readonly offline: boolean;
   /** Falso quando o navegador negou armazenamento e nada será persistido. */
   readonly persistente: boolean;
+  readonly sync: EstadoSync;
 }
 
 /** Comandos que a interface pode disparar. */
@@ -57,4 +65,5 @@ export interface Acoes {
   reiniciar(): void;
   dispensarAviso(): void;
   trocarDeck(id: string): void;
+  sincronizar(): void;
 }

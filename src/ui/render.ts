@@ -40,9 +40,27 @@ function cabecalho(tela: Tela, acoes: Acoes): HTMLElement {
   const marcas = elemento('div', 'cabecalho__marcas');
   if (tela.offline) marcas.append(elemento('span', 'marca marca--offline', 'offline'));
   if (!tela.persistente) marcas.append(elemento('span', 'marca marca--alerta', 'sem persistência'));
+
+  const sincronizando = tela.sync.situacao === 'sincronizando';
+  const botaoSync = botao(sincronizando ? 'sincronizando…' : 'sincronizar', 'sync__botao', () =>
+    acoes.sincronizar(),
+  );
+  botaoSync.disabled = sincronizando;
+  marcas.append(botaoSync);
   barra.append(marcas);
 
   return barra;
+}
+
+function faixaDeSync(tela: Tela): HTMLElement | null {
+  if (tela.sync.detalhe === null) return null;
+  const linha = elemento(
+    'p',
+    `sync__detalhe${tela.sync.situacao === 'erro' ? ' sync__detalhe--erro' : ''}`,
+    tela.sync.detalhe,
+  );
+  linha.setAttribute('role', 'status');
+  return linha;
 }
 
 function avisoDe(mensagem: string, acoes: Acoes): HTMLElement {
@@ -168,6 +186,9 @@ function corpo(visao: Visao, acoes: Acoes): readonly HTMLElement[] {
 export function renderizar(raiz: HTMLElement, tela: Tela, acoes: Acoes): void {
   raiz.replaceChildren();
   raiz.append(cabecalho(tela, acoes));
+
+  const sync = faixaDeSync(tela);
+  if (sync !== null) raiz.append(sync);
   if (tela.aviso !== null) raiz.append(avisoDe(tela.aviso, acoes));
   raiz.append(...corpo(tela.visao, acoes));
 }

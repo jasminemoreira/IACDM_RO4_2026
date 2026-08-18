@@ -11,8 +11,9 @@ import {
 } from '../session/index.js';
 import type { EstadoPersistido, RelatorioMigracao } from '../storage/index.js';
 import { progressoDe } from '../storage/index.js';
+import type { ResultadoSync } from '../sync/index.js';
 import { novaRevisao } from '../sync/index.js';
-import type { LinhaResumo, OpcaoDeck, Tela, Visao } from '../ui/index.js';
+import type { EstadoSync, LinhaResumo, OpcaoDeck, Tela, Visao } from '../ui/index.js';
 
 /** Estado completo da aplicação. */
 export interface EstadoApp {
@@ -25,7 +26,10 @@ export interface EstadoApp {
   readonly aviso: string | null;
   readonly offline: boolean;
   readonly persistente: boolean;
+  readonly sync: EstadoSync;
 }
+
+const SYNC_INICIAL: EstadoSync = { situacao: 'ociosa', detalhe: null };
 
 export interface OpcoesInicio {
   readonly deck: DeckIdentificado;
@@ -35,6 +39,7 @@ export interface OpcoesInicio {
   readonly aviso?: string | null;
   readonly offline?: boolean;
   readonly persistente?: boolean;
+  readonly sync?: EstadoSync;
 }
 
 export function iniciar(opcoes: OpcoesInicio): EstadoApp {
@@ -47,6 +52,7 @@ export function iniciar(opcoes: OpcoesInicio): EstadoApp {
     aviso: opcoes.aviso ?? null,
     offline: opcoes.offline ?? false,
     persistente: opcoes.persistente ?? true,
+    sync: opcoes.sync ?? SYNC_INICIAL,
   };
 }
 
@@ -90,6 +96,48 @@ export function comAviso(estado: EstadoApp, aviso: string | null): EstadoApp {
 
 export function comConexao(estado: EstadoApp, offline: boolean): EstadoApp {
   return { ...estado, offline };
+}
+
+export function sincronizando(estado: EstadoApp): EstadoApp {
+  return { ...estado, sync: { situacao: 'sincronizando', detalhe: estado.sync.detalhe } };
+}
+
+export function falhaDeSync(estado: EstadoApp, motivo: string): EstadoApp {
+  return { ...estado, sync: { situacao: 'erro', detalhe: `sincronização falhou: ${motivo}` } };
+}
+
+/** Texto curto do que a sincronização moveu. */
+export function resumoDeSync(resultado: ResultadoSync): string {
+  if (resultado.recebidas === 0 && resultado.enviadas === 0) {
+    return 'sincronizado, nada novo dos dois lados';
+  }
+  const partes: string[] = [];
+  if (resultado.recebidas > 0) partes.push(`${resultado.recebidas} recebida(s)`);
+  if (resultado.enviadas > 0) partes.push(`${resultado.enviadas} enviada(s)`);
+  return `sincronizado: ${partes.join(', ')}`;
+}
+
+/**
+ * Incorpora o log reconciliado.
+ *
+ * A sessão é reaberta sobre o progresso reprojetado: as revisões que este
+ * dispositivo acabou de fazer estão no log, então os cartões já revisados não
+ * voltam à fila — reabrir não desfaz trabalho, só passa a considerar o que o
+ * outro dispositivo registrou.
+ */
+export function aplicarSync(
+  estado: EstadoApp,
+  resultado: ResultadoSync,
+  agora: number,
+): EstadoApp {
+  const persistido = { ...estado.persistido, log: resultado.log };
+  return {
+    ...estado,
+    persistido,
+    sessao: iniciarSessao(estado.deck.cartoes, progressoDe(persistido), agora),
+    revelado: false,
+    sync: { situacao: 'ociosa', detalhe: resumoDeSync(resultado) },
+  };
 }
 
 /** Substitui o registro persistido depois de uma gravação bem-sucedida. */
@@ -172,5 +220,6 @@ export function telaDe(estado: EstadoApp): Tela {
     aviso: estado.aviso,
     offline: estado.offline,
     persistente: estado.persistente,
+    sync: estado.sync,
   };
 }

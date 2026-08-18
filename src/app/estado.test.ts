@@ -3,16 +3,21 @@ import { carregarDeck } from '../deck/index.js';
 import type { DeckIdentificado } from '../deck/index.js';
 import { MS_POR_DIA } from '../scheduler/index.js';
 import { migrarParaDeck } from '../storage/index.js';
-import { projetar } from '../sync/index.js';
+import { projetar, remotoMemoria, sincronizar } from '../sync/index.js';
+import type { Revisao } from '../sync/index.js';
 import type { EstadoApp } from './estado.js';
 import {
+  aplicarSync,
   avisoDeMigracao,
   comAviso,
   comConexao,
+  falhaDeSync,
   iniciar,
   reiniciar,
   responder,
+  resumoDeSync,
   revelar,
+  sincronizando,
   telaDe,
   visaoDe,
 } from './estado.js';
@@ -144,6 +149,87 @@ describe('registro das revisões no log', () => {
 
     expect(noFim).toBe(estado);
     expect(noFim.persistido.log).toHaveLength(12);
+  });
+});
+
+describe('sincronização na aplicação', () => {
+  /** Revisões que um outro dispositivo registrou sobre os mesmos cartões. */
+  const doOutro: readonly Revisao[] = [
+    { id: 'outro-1', dispositivo: 'outro', cartaoId: 'c001', q: 2, em: T0 + 5 },
+    { id: 'outro-2', dispositivo: 'outro', cartaoId: 'c007', q: 5, em: T0 + 6 },
+  ];
+
+  it('marca a interface enquanto sincroniza', () => {
+    expect(telaDe(sincronizando(novoEstado())).sync).toEqual({
+      situacao: 'sincronizando',
+      detalhe: null,
+    });
+  });
+
+  it('incorpora o log reconciliado e resume o que se moveu', async () => {
+    let estado = responder(novoEstado(), 5, T0);
+    const remoto = remotoMemoria(doOutro);
+
+    const resultado = await sincronizar(remoto, estado.persistido.log, T0 + 100);
+    estado = aplicarSync(estado, resultado, T0 + 100);
+
+    expect(estado.persistido.log.map((r) => r.id)).toEqual(['disp-1', 'outro-1', 'outro-2']);
+    expect(telaDe(estado).sync).toEqual({
+      situacao: 'ociosa',
+      detalhe: 'sincronizado: 2 recebida(s), 1 enviada(s)',
+    });
+  });
+
+  it('a revisão do outro dispositivo passa a contar no progresso', async () => {
+    let estado = responder(novoEstado(), 5, T0);
+    const remoto = remotoMemoria(doOutro);
+
+    estado = aplicarSync(
+      estado,
+      await sincronizar(remoto, estado.persistido.log, T0 + 100),
+      T0 + 100,
+    );
+
+    // c001: nota 5 daqui em T0, nota 2 do outro em T0+5 — as duas aplicadas
+    const c001 = estado.sessao.progresso.get('c001');
+    expect(c001?.n).toBe(0);
+    expect(c001?.intervaloDias).toBe(1);
+    // c007 só o outro revisou
+    expect(estado.sessao.progresso.get('c007')?.n).toBe(1);
+  });
+
+  it('a sessão reaberta não traz de volta o que este dispositivo já revisou', async () => {
+    let estado = novoEstado();
+    for (let i = 0; i < 3; i += 1) estado = responder(estado, 5, T0 + i);
+    const remoto = remotoMemoria(doOutro);
+
+    estado = aplicarSync(
+      estado,
+      await sincronizar(remoto, estado.persistido.log, T0 + 100),
+      T0 + 100,
+    );
+
+    // c001 foi revisado aqui e pelo outro; ambas as notas contam e ele volta a
+    // ficar devido, mas c002 e c003, só revisados aqui, não voltam
+    expect(estado.sessao.fila).not.toContain('c002');
+    expect(estado.sessao.fila).not.toContain('c003');
+  });
+
+  it('não perde a revisão local se o remoto falhar', () => {
+    const estado = responder(novoEstado(), 5, T0);
+    const comFalha = falhaDeSync(estado, 'o remoto está inacessível');
+
+    expect(comFalha.persistido.log).toEqual(estado.persistido.log);
+    expect(telaDe(comFalha).sync).toEqual({
+      situacao: 'erro',
+      detalhe: 'sincronização falhou: o remoto está inacessível',
+    });
+  });
+
+  it('resume o caso em que nada mudou', () => {
+    expect(resumoDeSync({ log: [], recebidas: 0, enviadas: 0, em: T0 })).toBe(
+      'sincronizado, nada novo dos dois lados',
+    );
   });
 });
 

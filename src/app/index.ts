@@ -1,5 +1,5 @@
 import { DECK_PADRAO, carregarDeck } from '../deck/index.js';
-import { registrarServiceWorker } from '../pwa/index.js';
+import { CAMINHO_SYNC, registrarServiceWorker } from '../pwa/index.js';
 import { ehNota } from '../scheduler/index.js';
 import {
   abrirProgresso,
@@ -8,18 +8,23 @@ import {
   identificarDispositivo,
 } from '../storage/index.js';
 import type { Deposito } from '../storage/index.js';
+import { ErroRemoto, remotoHttp, sincronizar as reconciliar } from '../sync/index.js';
+import type { Remoto } from '../sync/index.js';
 import { renderizar } from '../ui/index.js';
 import type { Acoes } from '../ui/index.js';
 import type { EstadoApp } from './estado.js';
 import {
+  aplicarSync,
   avisoDeMigracao,
   comAviso,
   comConexao,
   comPersistido,
+  falhaDeSync,
   iniciar,
   reiniciar,
   responder,
   revelar,
+  sincronizando,
   telaDe,
   visaoDe,
 } from './estado.js';
@@ -45,9 +50,10 @@ const acoesInertes: Acoes = {
   reiniciar: () => {},
   dispensarAviso: () => {},
   trocarDeck: () => {},
+  sincronizar: () => {},
 };
 
-async function montar(raiz: HTMLElement, deposito: Deposito): Promise<void> {
+async function montar(raiz: HTMLElement, deposito: Deposito, remoto: Remoto): Promise<void> {
   let estado: EstadoApp;
   const dispositivo = await identificarDispositivo(deposito);
 
@@ -94,6 +100,27 @@ async function montar(raiz: HTMLElement, deposito: Deposito): Promise<void> {
     }
   }
 
+  /**
+   * Reconcilia com o remoto e grava o resultado.
+   *
+   * Falha de rede não é excepcional aqui — a aplicação é offline-first —, então
+   * vira uma linha de estado no cabeçalho, não um erro que interrompe o estudo.
+   */
+  async function sincronizarAgora(): Promise<void> {
+    if (estado.sync.situacao === 'sincronizando') return;
+    aplicar(sincronizando(estado));
+
+    try {
+      const resultado = await reconciliar(remoto, estado.persistido.log, agora());
+      aplicar(aplicarSync(estado, resultado, agora()));
+      await persistir();
+    } catch (erro) {
+      const motivo =
+        erro instanceof ErroRemoto || erro instanceof Error ? erro.message : String(erro);
+      aplicar(falhaDeSync(estado, motivo));
+    }
+  }
+
   const acoes: Acoes = {
     revelar: () => aplicar(revelar(estado)),
     responder: (q) => {
@@ -106,6 +133,7 @@ async function montar(raiz: HTMLElement, deposito: Deposito): Promise<void> {
       anotarDeckNaUrl(id);
       void abrir(id).then(aplicar);
     },
+    sincronizar: () => void sincronizarAgora(),
   };
 
   document.addEventListener('keydown', (evento) => {
@@ -128,11 +156,18 @@ async function montar(raiz: HTMLElement, deposito: Deposito): Promise<void> {
   });
 
   for (const evento of ['online', 'offline'] as const) {
-    addEventListener(evento, () => aplicar(comConexao(estado, !navigator.onLine)));
+    addEventListener(evento, () => {
+      aplicar(comConexao(estado, !navigator.onLine));
+      if (evento === 'online') void sincronizarAgora();
+    });
   }
 
   estado = await abrir(deckPedido());
   desenhar();
+
+  // sincroniza de saída: é o que faz um dispositivo que acabou de abrir
+  // encontrar o que o outro registrou enquanto ele estava offline
+  if (navigator.onLine) void sincronizarAgora();
 }
 
 // O worker só existe no build de produção; em desenvolvimento não há o que registrar.
@@ -141,7 +176,7 @@ if (import.meta.env.PROD) void registrarServiceWorker();
 const raiz = document.getElementById('app');
 if (raiz === null) throw new Error('elemento #app não encontrado');
 
-montar(raiz, depositoPadrao()).catch((erro: unknown) => {
+montar(raiz, depositoPadrao(), remotoHttp(CAMINHO_SYNC)).catch((erro: unknown) => {
   const mensagem = erro instanceof Error ? erro.message : String(erro);
   renderizar(
     raiz,
@@ -151,6 +186,7 @@ montar(raiz, depositoPadrao()).catch((erro: unknown) => {
       aviso: null,
       offline: !navigator.onLine,
       persistente: false,
+      sync: { situacao: 'ociosa', detalhe: null },
     },
     acoesInertes,
   );

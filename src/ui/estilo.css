@@ -181,3 +181,21 @@ button { font: inherit; cursor: pointer; }
   text-decoration: underline;
   padding: 0;
 }
+
+.sync__botao {
+  padding: 0.125rem 0.625rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  border: 1px solid var(--borda);
+  background: var(--superficie);
+  color: var(--texto);
+}
+.sync__botao:hover:not(:disabled) { border-color: var(--destaque); color: var(--destaque); }
+.sync__botao:disabled { opacity: 0.6; cursor: progress; }
+
+.sync__detalhe {
+  margin: -0.75rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--texto-fraco);
+}
+.sync__detalhe--erro { color: var(--erro); }
