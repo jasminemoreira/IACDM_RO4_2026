@@ -181,3 +181,93 @@ todas as mudanças respondem "como isto falha?", nenhuma responde "o que mais po
 | `GET/POST /events` | **Network only**, sem cache, falha tolerada | Fundir sobre dados velhos seria pior que não fundir |
 | Navegação em `/` | **Cache first**, respondendo o casco | Abrir offline tem de renderizar |
 | **Ciclo de vida do cache** | Nome do cache = hash do manifesto; `activate` apaga os demais; `skipWaiting` + `clients.claim` | Sem isso, quem instalou a v1 nunca recebe correção nenhuma |
+
+---
+
+## V(3)
+
+Resposta aos 32 achados da Iteração 2. Duas mudanças estruturais e uma passagem de **escrita de
+contrato** sobre `event-store`, que a Iteração 2 mostrou ser o módulo subespecificado — não mal
+concebido. Nenhum módulo entra, nenhum sai.
+
+| id | module | responsibility | interface | depends-on |
+|------|--------|----------------|-----------|------------|
+| M-01 | scheduler | SM-2 da §4, literal e puro. `Math.round` (meio para +∞) fixado; `EF` nunca arredondado | `initialState() -> SchedulingState`; `applyGrade(s, q, at) -> SchedulingState`; `dueAt(s) -> number`; `isDue(s, now) -> boolean` | — |
+| M-02 | review-log | Ordem total, união por `eventId` e dobra em estado. Puro | `merge(a, b) -> ReviewEvent[]`; `fold(events) -> Map<CardId, SchedulingState>`; `applyOne(state, e) -> SchedulingState`; `orderKey(e) -> [number, string, number]` | scheduler |
+| M-03 | session | Apura devidos, ordena por `(dueAt, id)`, percorre. **`grade` produz apenas um rascunho; só `commit` avança a sessão** | `open(deck, states, now) -> Session`; `current(s) -> Card \| null`; `reveal(s) -> Session`; `grade(s, q) -> ReviewDraft`; `commit(s, evento) -> Session`; `isComplete(s) -> boolean` | scheduler, deck |
+| M-04 | deck | Valida o formato §5; versão por **FNV-1a de 32 bits sobre a forma canônica** `id\|hanzi\|pinyin\|gloss` unida por `\n` (fonte citada em `specs/references/fnv-1a.md`); difere versões; ids ativos. Puro | `parse(json) -> Deck`; `versionOf(deck) -> string`; `diff(prev, next) -> {added, removed, edited}`; `activeCardIds(deck) -> Set<CardId>` | — |
+| M-05 | storage | Repository + IndexedDB. **`seq` sai de um registro `meta` alocado na MESMA transação do append, ao lado do `replicaId`** — nunca de `autoIncrement`. Eventos remotos entram por `ingest`, verbatim. Esquema versionado; queda para memória é ruidosa | `append(draft) -> Promise<ReviewEvent>`; `ingest(events) -> Promise<number>`; `all() -> Promise<ReviewEvent[]>`; `replicaId() -> Promise<string>`; `deckVersion() -> Promise<string \| null>`; `setDeckVersion(v) -> Promise<void>`; `watermarks() -> Promise<Watermarks>`; `setWatermarks(w) -> Promise<void>`; `mode() -> 'idb' \| 'memoria'` | — |
+| M-06 | sync | Protocolo sobre o cursor `sseq`, com `epoch` do servidor; estado `idle\|running`; sem repetição automática; valida tudo que entra; **grava os puxados ANTES de avançar a marca d'água** | `push() -> Promise<SyncReport>`; `pull() -> Promise<SyncReport>`; `synchronize() -> Promise<SyncReport>`; `state() -> 'idle' \| 'running'` | review-log, storage |
+| M-07 | ui | Casco (HTML, CSS, `manifest.webmanifest`, ícone) e tela de revisão. Não depende de nada; `ViewModel` declarado; **atualização dirigida que preserva foco**; só `textContent` | `mount(root, handlers) -> void`; `render(vm: ViewModel) -> void` | — |
+| M-08 | app | Composição e laço do caso de uso, com **sequência de arranque declarada** e exclusão mútua entre nota e sincronização | `start(ports: Ports) -> Promise<void>`; `diag() -> Diagnostico` | scheduler, review-log, session, deck, storage, sync, ui |
+| M-09 | service-worker | Precache do casco a partir de `precache-manifest.json`; cache nomeado pelo hash do manifesto; `activate` apaga os demais. **Sem `skipWaiting`**: a versão nova espera, e a página oferece recarregar | eventos `install`, `activate`, `fetch`; `buildPrecacheManifest()` (build) | — |
+| M-10 | server | Só HTTP: rotas, limite de corpo de 1 MiB, `Origin` **ou** `Sec-Fetch-Site: same-origin` exigidos em `/events`, bind em `127.0.0.1`, estáticos por allowlist do manifesto | `GET /events?after=<sseq>`; `POST /events`; estáticos | event-store |
+| M-11 | event-store | Persistência no servidor: JSONL append-only **com `fsync` antes de responder**, fila serializada de escrita, `sseq` e `epoch`, índice em memória, trava de instância única, contrato de erro explícito | `append(events) -> Promise<{stored: {eventId, sseq}[]}>`; `after(sseq) -> Promise<{events, sseq, epoch}>`; `health() -> {contagem, ultimoSseq, epoch, linhasDescartadas}`; erros `EventStoreError{code}` | review-log |
+
+### Mudanças estruturais
+
+**1. `seq` deixa de vir do `autoIncrement`** (resolve ASS-08). Passa a ser um contador no
+registro `meta`, **ao lado do `replicaId`**, alocado na mesma transação `readwrite` do append —
+atômica no IndexedDB. Assim o par `(replicaId, seq)` só pode reiniciar se o `replicaId` também
+reiniciar, e aí não há colisão possível. A unicidade deixa de depender de um contador que o
+navegador pode zerar sozinho.
+
+**2. `storage.ingest` e `session.commit`** (resolvem ASS-07 e ARQ-06). `ingest` grava eventos
+remotos **verbatim**, sem recarimbar identidade — o log volta a ser a união que a reconciliação
+pressupõe. E `session.grade` passa a devolver só um `ReviewDraft`: **avançar a sessão exige
+`commit(s, evento)` com o evento já gravado**. A garantia "grava antes de avançar" deixa de ser
+prosa e passa a ser impossível de violar sem mentir no tipo.
+
+### Durabilidade — a correção de RES-06
+
+`event-store.append` só resolve **depois do `fsync`**. `stored` passa a ser promessa de
+durabilidade, e é sobre ela que o cliente avança a marca d'água. Um `fsync` por lote (não por
+evento) amortiza o custo. `stored` devolve `{eventId, sseq}` para cada evento **durável após a
+chamada, inclusive os já conhecidos** — porque "entregue" é o que o cliente precisa saber, e
+já-conhecido também é entregue (fecha LIN-08 e GOV-03).
+
+### Contrato de `event-store`, escrito
+
+| Questão | Resposta declarada | Fecha |
+|---|---|---|
+| Escritas concorrentes | Fila serializada sobre um único descritor | RES-07 |
+| Erros | `EventStoreError{code}`; `ENOSPC` → 507, `EACCES` → 500 | IMP-06 |
+| Bytes do cliente | O servidor **re-serializa** com `JSON.stringify` após validar; nunca ecoa | SEC-06 |
+| Linha truncada na leitura | Descartada **e contada** em `health().linhasDescartadas`, com aviso em stderr | OBS-04 |
+| Duas instâncias | Trava `server.lock` com `O_EXCL`; a segunda recusa arrancar com mensagem clara | ASS-11 |
+| Custo do `after` | Índice em memória carregado no arranque; sem varredura por sincronização | PERF-04 |
+| Sistema de arquivos | **Disco local apenas** — `appendFile` não é atômico em FS de rede | MEC-06 |
+| Restauração de backup | `epoch` gerado na criação do arquivo; se o cliente vir `epoch` diferente, zera a marca d'água de leitura | ASS-09 |
+
+### Premissas
+
+A-1 a A-16 de V(2) seguem valendo, com três reescritas e duas novas:
+
+| # | Premissa | Estado |
+|---|---|---|
+| A-4 | **A identidade do evento não depende do relógio nem do banco:** `${replicaId}#${seq}`, com `seq` num registro `meta` ao lado do `replicaId`, alocado na mesma transação do append | **reescrita em V(3)** |
+| A-5 | `replicaId` é único entre dispositivos **e só reinicia junto com o `seq`** | **reescrita em V(3)** |
+| A-8 | Uma aba escreve por vez. Duas abas continuam sendo escritoras concorrentes — o `seq` transacional impede colisão de identidade, não visões divergentes em memória | mantida frágil |
+| A-11 | Um único espaço de progresso **por instância de servidor, garantido por trava de arquivo** | **reescrita em V(3)** |
+| A-17 | **`stored` é promessa de durabilidade: só é devolvido depois de `fsync`** | **nova** |
+| A-18 | **O servidor roda em disco local; sistema de arquivos de rede não é suportado** | **nova** |
+
+As demais (A-1, A-2, A-3, A-6, A-7, A-9, A-10, A-12, A-13, A-14, A-15, A-16) seguem
+exatamente como escritas em V(2).
+
+### Aceitos com justificativa nesta rodada
+
+| id | Razão |
+|---|---|
+| SEC-07 | duplica SEC-01: sem identidade no endpoint (§3 exclui autenticação), forjar `replicaId` é o mesmo resíduo já aceito, agora reduzido pelo bind em loopback e pela exigência de `Origin` |
+| SUS-03 | O arquivo do servidor cresce como o log do cliente; a decisão de não compactar segue valendo, e a Fase 6 passa a **medir os dois** |
+| CTL-04 | Não repetir automaticamente é deliberado (evita a tempestade de RES-01). O laço é fechado pelo humano, e o contador de pendências na interface é a realimentação |
+| REG-04 | O roteiro do cenário de conflito é artefato de teste, não de módulo: `specs/examples/conflict-scenario.md` passa a ser executado por um teste da Fase 6, e é ali que o dono está |
+| ARQ-05 | `event-store` importar `review-log` **é o desenho, não um vazamento**: módulos puros são agnósticos de implantação por construção, e é isso que faz navegador e servidor deduplicarem igual. A fronteira fica declarada aqui: puros (M-01..M-04) rodam nos dois lados; os demais, num só |
+
+### Escopo negativo e estratégia de cache
+
+Escopo negativo idêntico ao de V(1) e V(2). Estratégia de cache idêntica à de V(2), com uma
+mudança: **o ciclo de vida deixa de usar `skipWaiting`/`clients.claim`** — o service worker novo
+espera, `activate` limpa os caches de outras versões, e a página detecta o worker em espera e
+oferece recarregar. Fecha MIG-04 sem reabrir MIG-02.
