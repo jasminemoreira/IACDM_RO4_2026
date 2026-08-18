@@ -63,7 +63,15 @@ O diretório-pai continua sendo `RO4/`, e um `ls ..` a partir de um braço ainda
 não expõe só a existência do piloto, e sim a hipótese, o braço esperado e onde o efeito é
 esperado. Nenhuma renomeação resolve: só mover os braços para fora da árvore do `RO4/`, ou
 mover o material de coordenação para um diretório que não seja irmão dos braços.
-**Decisão pendente da operadora antes do início do braço A.**
+
+**Decidido em 2026-08-18, antes do início do braço A: aceitar e registrar.** Os braços
+ficam onde estão. Fundamento: é piloto de medibilidade, nada daqui entra em análise (§1 e
+§8 do `PILOTO.md`), e o vazamento exige que a sessão suba de diretório por conta própria —
+não é apresentado a ela. **Limitação conhecida deste piloto, a corrigir na batelada
+válida**, onde o dado é citável e o custo de uma sessão curiosa deixa de ser zero.
+
+Se durante a execução houver indício de que uma sessão leu material acima do seu
+diretório, registrar no §5 e tratar o braço como descartado — não como recuperável.
 
 ## 3b. Fronteira de incremento — convenção de medição
 
