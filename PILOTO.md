@@ -6,7 +6,7 @@ Escrito em 2026-08-18.
 > predição e onde o efeito é esperado. Um agente que o leia é um agente informado do
 > resultado desejado, o que contamina o **tratamento** e não apenas o artefato.
 >
-> Vive fora de `pilot_proj/` por isso, e porque `.versus/inject-context.js` injeta
+> Vive fora de `hanzi-pwa-w2/` por isso, e porque `.versus/inject-context.js` injeta
 > contexto do diretório do projeto. O que chega aos braços é
 > **[`TAREFA-PILOTO.md`](TAREFA-PILOTO.md)**, copiado como `REQUISITOS.md` na raiz de
 > cada braço, e que contém requisitos e nada mais.
@@ -37,8 +37,13 @@ ceder a ela é perder o experimento inteiro.
 
 | braço | diretório | condição |
 |---|---|---|
-| **C — processo exigível** | `pilot_proj/` | IACDM completo, *gates* operados pelo instrumento |
-| **A — direto** | `pilot_direct/` | sem Versus, sem `specs/`, sem fases; revisão só ao final |
+| **C — processo exigível** | `hanzi-pwa-w2/` | IACDM completo, *gates* operados pelo instrumento |
+| **A — direto** | `hanzi-pwa-w1/` | sem Versus, sem `specs/`, sem fases; revisão só ao final |
+
+> Os diretórios foram renomeados em 2026-08-18, antes de qualquer execução: `pilot_proj`
+> e `pilot_direct` diziam à sessão que a operava que ela era braço de um piloto, e qual
+> dos dois — mesma classe de vazamento que o §4 evitou ao renomear a tarefa para
+> `REQUISITOS.md`. Os nomes de braço vivem agora só no remoto, como branch.
 
 O braço **B** (processo por instrução) **não entra no piloto**. Ele existe para separar
 *ter processo* de *forçar processo*, e essa separação só importa depois que a métrica se

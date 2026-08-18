@@ -26,8 +26,8 @@ viés de ordem que a operadora pode remover sem custo.
 
 | braço | diretório | branch remoto | início | fim |
 |---|---|---|---|---|
-| A — direto | `pilot_direct/` | `braco-A` | — | — |
-| C — processo exigível | `pilot_proj/` | `braco-C` | — | — |
+| A — direto | `hanzi-pwa-w1/` | `braco-A` | — | — |
+| C — processo exigível | `hanzi-pwa-w2/` | `braco-C` | — | — |
 
 ## 3. Decisões de montagem — coordenação, antes do início
 
@@ -39,13 +39,28 @@ viés de ordem que a operadora pode remover sem custo.
 | 2026-08-18 | branch local de cada braço chamado `main`; o nome do braço existe **só no remoto**, via *refspec* `main:braco-A` / `main:braco-C` | mesma razão de `TAREFA-PILOTO.md` virar `REQUISITOS.md`: um branch `braco-A` denunciaria o experimento à sessão que o opera |
 | 2026-08-18 | repositório de coordenação na raiz do `RO4/`, com os dois braços em `.gitignore` | `PILOTO.md` versionado sem entrar em nenhum *work tree* de braço |
 
+### Renomeação dos diretórios dos braços — 2026-08-18, antes de qualquer execução
+
+`pilot_proj/` → `hanzi-pwa-w2/` (braço C) · `pilot_direct/` → `hanzi-pwa-w1/` (braço A).
+
+Os nomes antigos diziam à sessão que operava o braço que ela era braço de um piloto, e
+`_proj` vs `_direct` dizia **qual condição era qual** — mesma classe de vazamento que o
+§4 do `PILOTO.md` evitou ao renomear a tarefa para `REQUISITOS.md`, e pior, porque
+identificava o tratamento. Os nomes novos são simétricos e não carregam condição: entre
+os dezoito diretórios de `INDT/`, leem-se como projeto comum.
+
+Feito antes de existir qualquer código, com o hash de `TAREFA-PILOTO.md` inalterado e os
+dois braços ainda no mesmo SHA (`b909b82`). `PILOTO.md` §3 e `CONGELAMENTO.txt` atualizados,
+cada um com a nota do porquê.
+
 ### Contaminação residual conhecida, não corrigida
 
-Os nomes de diretório `pilot_proj/` e `pilot_direct/` são visíveis à sessão que opera
-cada braço e denunciam a existência de um piloto — a mesma classe de vazamento que o §4
-evitou ao renomear a tarefa para `REQUISITOS.md`. Fixados na tabela do §3 do `PILOTO.md`;
-não renomeados por decisão unilateral da coordenação. **Decisão pendente da operadora**
-antes do início do braço A.
+O diretório-pai continua sendo `RO4/`, e um `ls ..` a partir de um braço ainda alcança
+`PILOTO.md`, `CONGELAMENTO.txt` e este log — que é o vazamento mais grave dos dois, porque
+não expõe só a existência do piloto, e sim a hipótese, o braço esperado e onde o efeito é
+esperado. Nenhuma renomeação resolve: só mover os braços para fora da árvore do `RO4/`, ou
+mover o material de coordenação para um diretório que não seja irmão dos braços.
+**Decisão pendente da operadora antes do início do braço A.**
 
 ## 4. Discrição da operadora nos *gates* — braço C
 
