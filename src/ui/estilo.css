@@ -129,5 +129,7 @@ button { font: inherit; cursor: pointer; }
   border-top: 1px solid var(--borda);
   font-size: 0.9375rem;
 }
-.resumo__id { font-family: ui-monospace, monospace; color: var(--texto-fraco); }
+.resumo__cartao { display: flex; align-items: baseline; gap: 0.5rem; min-width: 0; }
+.resumo__hanzi { font-family: var(--fonte-hanzi); font-size: 1.125rem; }
+.resumo__gloss { color: var(--texto-fraco); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .resumo__intervalo { color: var(--texto-fraco); }

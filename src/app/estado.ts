@@ -1,4 +1,5 @@
 import type { Deck } from '../deck/index.js';
+import { cartaoPorId } from '../deck/index.js';
 import type { Nota } from '../scheduler/index.js';
 import type { Progresso, Sessao } from '../session/index.js';
 import {
@@ -8,7 +9,7 @@ import {
   iniciarSessao,
   responder as responderSessao,
 } from '../session/index.js';
-import type { Visao } from '../ui/index.js';
+import type { LinhaResumo, Visao } from '../ui/index.js';
 
 /** Estado completo da aplicação: a sessão corrente mais o que a tela mostra dela. */
 export interface EstadoApp {
@@ -65,5 +66,15 @@ export function visaoDe(estado: EstadoApp): Visao {
     return { tipo: 'nada-devido', proximaRevisao: proximoPrazo(sessao.progresso) };
   }
 
-  return { tipo: 'fim', respostas: sessao.respostas };
+  const respostas: LinhaResumo[] = sessao.respostas.map((r) => {
+    const cartao = cartaoPorId(estado.deck, r.cartaoId);
+    return {
+      cartaoId: r.cartaoId,
+      hanzi: cartao?.hanzi ?? r.cartaoId,
+      gloss: cartao?.gloss ?? '',
+      q: r.q,
+      intervaloDias: r.intervaloDias,
+    };
+  });
+  return { tipo: 'fim', respostas };
 }

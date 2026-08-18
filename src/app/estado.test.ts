@@ -48,8 +48,8 @@ describe('visaoDe', () => {
     expect(visao.tipo).toBe('fim');
     if (visao.tipo === 'fim') {
       expect(visao.respostas).toEqual([
-        { cartaoId: 'c001', q: 5, intervaloDias: 1 },
-        { cartaoId: 'c002', q: 3, intervaloDias: 1 },
+        { cartaoId: 'c001', hanzi: '你好', gloss: 'hello', q: 5, intervaloDias: 1 },
+        { cartaoId: 'c002', hanzi: '谢谢', gloss: 'thank you', q: 3, intervaloDias: 1 },
       ]);
     }
   });

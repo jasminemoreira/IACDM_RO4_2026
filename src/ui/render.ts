@@ -80,8 +80,12 @@ function telaFim(visao: Extract<Visao, { tipo: 'fim' }>, acoes: Acoes): readonly
   const lista = elemento('ul', 'resumo__lista');
   for (const r of visao.respostas) {
     const item = elemento('li', 'resumo__item');
+    const cartao = elemento('span', 'resumo__cartao');
+    const hanzi = elemento('span', 'resumo__hanzi', r.hanzi);
+    hanzi.lang = 'zh-Hans';
+    cartao.append(hanzi, elemento('span', 'resumo__gloss', r.gloss));
     item.append(
-      elemento('span', 'resumo__id', r.cartaoId),
+      cartao,
       elemento('span', 'resumo__nota', `nota ${r.q}`),
       elemento('span', 'resumo__intervalo', `volta em ${dias(r.intervaloDias)}`),
     );

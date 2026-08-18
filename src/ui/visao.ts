@@ -1,6 +1,14 @@
 import type { Cartao } from '../deck/index.js';
 import type { Nota } from '../scheduler/index.js';
-import type { Resposta } from '../session/index.js';
+
+/** Uma linha do resumo de fim de sessão. */
+export interface LinhaResumo {
+  readonly cartaoId: string;
+  readonly hanzi: string;
+  readonly gloss: string;
+  readonly q: Nota;
+  readonly intervaloDias: number;
+}
 
 /** O que a interface precisa saber para desenhar a tela. Nada além disto. */
 export type Visao =
@@ -13,7 +21,7 @@ export type Visao =
     }
   | {
       readonly tipo: 'fim';
-      readonly respostas: readonly Resposta[];
+      readonly respostas: readonly LinhaResumo[];
     }
   | {
       readonly tipo: 'nada-devido';
