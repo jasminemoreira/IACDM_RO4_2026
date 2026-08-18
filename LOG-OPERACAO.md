@@ -17,6 +17,9 @@ Preenchido em 2026-08-18, antes de qualquer execução em qualquer braço.
 | instrumento, braço A | nenhum |
 | ordem de execução | **A antes de C** |
 | tarefa | `TAREFA-PILOTO.md`, sha256 `e7dbfd80d7431f847c965d3aae2053bcf3ba2e2d95d2304707196892608144f0` |
+| extrator | `extrair.py`, escrito e validado antes de qualquer execução |
+| git (instrumento de medição) | 2.34.1 |
+| python (extração) | 3.12.1 |
 
 Motivo da ordem: a operadora é a autora do método. Rodar o braço direto **primeiro**
 evita operá-lo depois de já ter visto o braço C construir a mesma tarefa — o único
@@ -61,6 +64,33 @@ não expõe só a existência do piloto, e sim a hipótese, o braço esperado e 
 esperado. Nenhuma renomeação resolve: só mover os braços para fora da árvore do `RO4/`, ou
 mover o material de coordenação para um diretório que não seja irmão dos braços.
 **Decisão pendente da operadora antes do início do braço A.**
+
+## 3b. Fronteira de incremento — convenção de medição
+
+O §6 do `PILOTO.md` define `t₀(k)` *dentro* do incremento `k`, mas não diz como recuperar
+`k` do histórico. Sem convenção, os incrementos não são separáveis e o piloto cairia em
+REDESENHO por falha de instrumentação, não por achado.
+
+**Convenção, idêntica nos dois braços:** ao aceitar o incremento `k`, a operadora marca
+
+```
+git tag -a inc<k>-fim -m "incremento <k> aceito"
+```
+
+no commit aceito. Incremento `k` = commits em `(inc<k-1>-fim, inc<k>-fim]`.
+
+É ato de operadora, não instrução ao braço: não toca no `REQUISITOS.md` congelado, não
+altera o tratamento e não pede ao modelo nada que o §6 da tarefa já não peça. Sem as tags
+o `extrair.py` **falha alto** — não estima fronteira nem cai para melhor esforço.
+
+## 3c. Validação do extrator — antes de qualquer execução
+
+Testado contra histórico sintético de 10 commits e 3 incrementos, com churn calculado à
+mão: esperado `3 · 3 · 10 = 16`, `|M|=4 |E|=3 |I|=6`, normalizado `1,2308` — medido idêntico.
+Cobre os três modos de falha que importam: commit não-código não vira `t₀`, renomeação de
+export conta `ΔI=2`, renomeação de módulo conta `10`. `|ΔX|` é diferença simétrica, não
+variação líquida — no mesmo histórico a leitura líquida daria `4` e faria um piloto com
+churn real parecer NO-GO por artefato do script.
 
 ## 4. Discrição da operadora nos *gates* — braço C
 
