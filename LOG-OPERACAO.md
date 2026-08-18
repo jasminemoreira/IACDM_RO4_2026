@@ -148,6 +148,7 @@ Todo descarte e toda intervenção, nos dois braços, no ato.
 
 | data | braço | o quê | motivo |
 |---|---|---|---|
+| 2026-08-18 | A | tag `inc1-fim` criada pela coordenação em `9cf6095`, depois de o incremento 2 já ter começado | o aceite do incremento 1 é ato da operadora e já estava registrado no próprio commit (*"aceitação do Incremento 1"*); a tag só o torna legível para o extrator. Tag em git é retroativa e o extrator usa posição no histórico, não data da tag — nenhum dado afetado |
 | 2026-08-18 | instrumento de medição | `extrair.py`: resolvedor de import passa a desfazer a troca ESM do TypeScript (`../deck/index.js` → `index.ts`) | com o bug, **nenhuma** aresta entre módulos resolvia e `E` ficava zerada nos dois braços — um terço da DV morto sem sinal. Detectado no aviso de imports não resolvidos, ao verificar o incremento 1 do braço A, antes de qualquer extração definitiva. Regressão contra o histórico sintético do §3c refeita e idêntica (`16` · `1,2308`). Nenhum dado havia sido extraído antes da correção |
 
 ## 6. Violações de protocolo
