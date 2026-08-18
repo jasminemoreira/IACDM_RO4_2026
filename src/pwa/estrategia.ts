@@ -9,6 +9,13 @@ export const PREFIXO_CACHE = 'hanzi-';
 /** O documento que responde a qualquer navegação — o *app shell*. */
 export const CASCA = '/index.html';
 
+/**
+ * Caminho da sincronização. Fica de fora do cache mesmo sendo da própria
+ * origem: uma resposta guardada aqui devolveria um log velho e desfaria a
+ * reconciliação. Sync é sempre rede, e falha de rede é tratada pela aplicação.
+ */
+export const CAMINHO_SYNC = '/sync';
+
 export function nomeDoCache(versao: string): string {
   return `${PREFIXO_CACHE}${versao}`;
 }
@@ -24,8 +31,8 @@ export interface Pedido {
  * O que fazer com um pedido:
  * - `casca`: navegação, respondida com o documento pré-cacheado;
  * - `cache`: recurso da própria origem, respondido do cache e, se faltar, da rede;
- * - `rede`: qualquer outra coisa — outros métodos, outras origens — direto à rede,
- *   sem passar pelo cache. É por aqui que a sincronização do Incremento 3 sairá.
+ * - `rede`: qualquer outra coisa — outros métodos, outras origens e a
+ *   sincronização — direto à rede, sem passar pelo cache.
  */
 export type Rota = 'casca' | 'cache' | 'rede';
 
@@ -39,7 +46,9 @@ export function rotaDe(pedido: Pedido, origem: string): Rota {
   } catch {
     return 'rede';
   }
-  return url.origin === origem ? 'cache' : 'rede';
+  if (url.origin !== origem) return 'rede';
+  if (url.pathname === CAMINHO_SYNC || url.pathname.startsWith(`${CAMINHO_SYNC}/`)) return 'rede';
+  return 'cache';
 }
 
 /** Caches de builds anteriores, que a ativação deve apagar. */

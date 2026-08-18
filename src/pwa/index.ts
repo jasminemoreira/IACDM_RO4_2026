@@ -4,5 +4,12 @@
  * entrada do build e não é importado pela aplicação.
  */
 export type { Pedido, Rota } from './estrategia.js';
-export { CASCA, PREFIXO_CACHE, cachesObsoletos, nomeDoCache, rotaDe } from './estrategia.js';
+export {
+  CAMINHO_SYNC,
+  CASCA,
+  PREFIXO_CACHE,
+  cachesObsoletos,
+  nomeDoCache,
+  rotaDe,
+} from './estrategia.js';
 export { CAMINHO_SW, registrarServiceWorker } from './registro.js';

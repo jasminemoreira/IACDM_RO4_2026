@@ -53,8 +53,14 @@ function precache(estaticos: readonly string[]): Plugin {
   };
 }
 
+const PROXY_SYNC = {
+  '/sync': { target: 'http://localhost:5179', changeOrigin: true },
+};
+
 export default defineConfig({
   plugins: [precache(ESTATICOS)],
+  server: { proxy: PROXY_SYNC },
+  preview: { proxy: PROXY_SYNC },
   build: {
     target: 'es2022',
     rollupOptions: {

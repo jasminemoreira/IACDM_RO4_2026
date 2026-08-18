@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.sw.json"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.sw.json",
+    "remoto": "node servidor/remoto.mjs"
   },
   "devDependencies": {
     "typescript": "^5.6.3",

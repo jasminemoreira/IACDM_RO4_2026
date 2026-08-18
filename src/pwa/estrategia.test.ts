@@ -15,6 +15,16 @@ describe('rotaDe', () => {
     expect(rotaDe(pedido(`${ORIGEM}/favicon.svg`), ORIGEM)).toBe('cache');
   });
 
+  it('nunca cacheia a sincronização, mesmo sendo da própria origem', () => {
+    expect(rotaDe(pedido(`${ORIGEM}/sync`), ORIGEM)).toBe('rede');
+    expect(rotaDe(pedido(`${ORIGEM}/sync?desde=10`), ORIGEM)).toBe('rede');
+    expect(rotaDe(pedido(`${ORIGEM}/sync/lote`), ORIGEM)).toBe('rede');
+  });
+
+  it('não confunde outro caminho que só começa parecido', () => {
+    expect(rotaDe(pedido(`${ORIGEM}/syncronia.js`), ORIGEM)).toBe('cache');
+  });
+
   it('não cacheia outra origem', () => {
     expect(rotaDe(pedido('https://outro.exemplo/dados.json'), ORIGEM)).toBe('rede');
   });
