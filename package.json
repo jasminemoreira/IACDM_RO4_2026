@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && tsc --noEmit -p tsconfig.sw.json && vite build",
+    "build": "npm run typecheck && vite build && vite build --config vite.sw.config.ts",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -13,6 +13,7 @@
     "remoto": "node servidor/remoto.mjs"
   },
   "devDependencies": {
+    "@types/node": "^26.2.0",
     "typescript": "^5.6.3",
     "vite": "^5.4.10",
     "vitest": "^2.1.4"
