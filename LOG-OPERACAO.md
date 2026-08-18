@@ -192,12 +192,42 @@ terceirizar.
 | data | gate | o que a operadora decidiu | por quê |
 |---|---|---|---|
 | 2026-08-18 | G0 | alvo de entrega = **produto completo, 3 incrementos** (contra "MVP primeiro, depois iterar" e "protótipo") | é a leitura literal do `REQUISITOS.md` §6 — *"cada incremento é entregue e aceito antes do seguinte começar"* — e é a única opção que mantém os braços comparáveis: o braço A entregou os três. MVP teria reduzido o braço C a um terço do escopo do A, e a diferença de churn viraria diferença de tamanho |
+| 2026-08-18 | G0 | lapso `q<3` = **literal, sai da sessão e volta em 1 dia** (contra SM-2 clássico com fila intra-sessão) | o pseudocódigo do `REQUISITOS.md` §4 escreve `n=0; I=1` e nada sobre reapresentar na mesma sessão; a §4 proíbe variante. Terceirizável |
+| 2026-08-18 | G0 | migração de deck = **`id` é a identidade, preserva tudo** (progresso de cartão removido fica retido e ressuscita; conteúdo editado com mesmo `id` mantém progresso) | é a leitura mais forte de *"migra o progresso sem perda"* (I2). As outras duas descartam revisões em algum caso, e "sem perda" passaria a valer só para os sobreviventes. Terceirizável |
+| 2026-08-18 | G0 | pesquisa web permitida, com depósito em `specs/` e citação de fonte | decisão de processo, não de produto; não altera o artefato medido. Terceirizável por protocolo |
+| 2026-08-18 | G0 | remoto do incremento 3 = **endpoint JSON simples, servidor real** (contra duplo local no navegador) | **a única das quatro que a especificação congelada NÃO responde**: o §6 do `REQUISITOS.md` diz explicitamente *"pode ser um endpoint JSON simples ou um duplo local"*. Discrição genuína. **Ver a marca de contaminação abaixo** |
+
+### Contaminação: a escolha do remoto coincide com o braço A
+
+O braço A implementou servidor HTTP real (`servidor/remoto.mjs`, commit `f14eb6b`). A operadora
+operou o braço A inteiro antes de responder este `gate`, e escolheu para o braço C a mesma
+opção — contra a alternativa que o próprio instrumento descreve como mais reproduzível.
+
+Não é acusação de má-fé, e não há como distinguir convergência de vazamento com n=1. É o custo
+previsto da ordem serial A→C com operadora única, discutido em 2026-08-18 quando o paralelo foi
+recusado, e agora materializado num ponto identificável.
+
+**Direção do viés:** alinhar as escolhas de desenho do braço C às do braço A **reduz** a
+divergência entre os braços e torna a comparação de churn mais conservadora — menos provável
+de mostrar diferença, não mais. Para um piloto de medibilidade é tolerável; para a batelada
+válida, não é, e a correção é operador que não construiu o braço anterior.
+
+**Para a batelada válida:** este ponto exige regra no protocolo, não escolha no ato — por
+exemplo, fixar o remoto na especificação congelada, como o §4 do `PILOTO.md` já fez com o SM-2
+pelo mesmo motivo ("deixá-lo declarado mas livre permitiria aos dois braços escolherem
+algoritmos diferentes, e estrutura de módulo diferente por consequência — confundidor evitável
+a custo zero"). O remoto é o mesmo caso, e passou despercebido no congelamento.
 
 **Observação de método, não de projeto:** o instrumento *perguntou* o alvo de entrega mesmo
 com o `REQUISITOS.md` congelado respondendo à pergunta no §6. A operadora não escolheu escopo,
 transcreveu a especificação. É caso de discrição **terceirizável**: a batelada válida pode
 responder isto por regra ("alvo = o que a especificação congelada disser"), sem operador
 humano no laço. Primeiro item concreto da lista que o §5 do `PILOTO.md` manda levantar.
+
+Placar de G0, cinco decisões: **quatro terceirizáveis** por regra derivada da especificação
+congelada (alvo de entrega, lapso `q<3`, migração de deck, política de pesquisa) e **uma
+genuína** (o remoto), que a especificação delega de propósito. A batelada válida pode tirar o
+humano de quatro dos cinco pontos — e deveria fechar o quinto no congelamento.
 
 ## 5. Descartes e intervenções
 
