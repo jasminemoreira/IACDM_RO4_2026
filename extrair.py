@@ -28,6 +28,25 @@ I(c)  símbolos exportados por módulo, como pares (módulo, símbolo) distintos
 t0(k) primeiro commit de k que acrescenta ou altera código executável sob src/,
       excluindo JSON de conteúdo e configuração
 
+CHURN RETROATIVO (secundário)
+-----------------------------
+A fórmula do §6 conta tudo que vem depois de t0(k) — e depois de t0(k) está o grosso
+da CONSTRUÇÃO do incremento. Um braço que constrói mais módulos pontua mais churn.
+O §6 em prosa quer outra coisa: "resolução de conflito força mudança no modelo de
+persistência projetado no incremento 2", que é o incremento k desfazendo o que k-1
+construiu.
+
+    retro(c) = |(P △ C) ∩ B|,  B = estado no aceite do incremento anterior
+
+Só conta elemento que JÁ EXISTIA quando o incremento começou. No incremento 1 dá 0
+por definição. Renomear um export criado no próprio incremento não conta; renomear
+um export herdado do incremento anterior conta. Sai AO LADO da primária, nunca no
+lugar dela: a DV registrada no §1 do LOG-OPERACAO.md não muda.
+
+`retro_em_t0` é o mesmo cálculo no PRÓPRIO commit t0(k), que a primária exclui por
+definição (só conta commits > t0). Vai separado para não esconder o caso em que o
+commit que abre o incremento já mexe no que veio antes.
+
 |ΔX| é a cardinalidade da DIFERENÇA SIMÉTRICA entre commits consecutivos, não a
 variação de tamanho. Renomear um módulo é churn 2, não 0 — é a leitura que mede
 retrabalho arquitetural, que é o que a DV quer. A variação líquida vai junto no
@@ -267,9 +286,12 @@ def analisar(repo):
     final = estados[hist[-1]["sha"]]
     denom = len(final["M"]) + len(final["E"]) + len(final["I"])
 
-    churn = churn_liquido = 0
+    churn = churn_liquido = churn_retro = retro_em_t0_total = 0
     detalhe = []
-    for inc in incs:
+    vazio = {"M": set(), "E": set(), "I": set()}
+    for idx_inc, inc in enumerate(incs):
+        # B: estado no aceite do incremento anterior. No primeiro, conjunto vazio.
+        base = vazio if idx_inc == 0 else estados[incs[idx_inc - 1]["commits"][-1]["sha"]]
         cs = inc["commits"]
         t0_idx = None
         for i, c in enumerate(cs):
@@ -289,10 +311,21 @@ def analisar(repo):
                 "fracao": round((t0_idx + 1) / len(cs), 3),
                 "primeiro_do_repo": cs[t0_idx]["sha"] == hist[0]["sha"],
             },
-            "churn": 0, "por_commit": [],
+            "churn": 0, "churn_retroativo": 0, "retro_em_t0": 0, "por_commit": [],
         }
 
+        def retro(ant, cur):
+            return (len((cur["M"] ^ ant["M"]) & base["M"])
+                    + len((cur["E"] ^ ant["E"]) & base["E"])
+                    + len((cur["I"] ^ ant["I"]) & base["I"]))
+
         if t0_idx is not None:
+            gt0 = next(j for j, h in enumerate(hist) if h["sha"] == cs[t0_idx]["sha"])
+            if gt0 > 0:
+                item["retro_em_t0"] = retro(estados[hist[gt0 - 1]["sha"]],
+                                            estados[cs[t0_idx]["sha"]])
+                retro_em_t0_total += item["retro_em_t0"]
+
             for c in cs[t0_idx + 1:]:
                 gpos = next(j for j, h in enumerate(hist) if h["sha"] == c["sha"])
                 ant = estados[hist[gpos - 1]["sha"]]
@@ -302,13 +335,16 @@ def analisar(repo):
                 dI = len(cur["I"] ^ ant["I"])
                 liq = (abs(len(cur["M"]) - len(ant["M"])) + abs(len(cur["E"]) - len(ant["E"]))
                        + abs(len(cur["I"]) - len(ant["I"])))
+                dR = retro(ant, cur)
                 item["churn"] += dM + dE + dI
+                item["churn_retroativo"] += dR
                 churn_liquido += liq
                 if dM + dE + dI:
                     item["por_commit"].append({
                         "sha": c["sha"][:8], "assunto": c["assunto"],
-                        "dM": dM, "dE": dE, "dI": dI})
+                        "dM": dM, "dE": dE, "dI": dI, "dR": dR})
             churn += item["churn"]
+            churn_retro += item["churn_retroativo"]
         detalhe.append(item)
 
     loc = sum(len(conteudo(repo, b).splitlines())
@@ -325,6 +361,9 @@ def analisar(repo):
         "churn_pos_t0": churn,
         "churn_normalizado": None if denom == 0 else round(churn / denom, 4),
         "churn_liquido": churn_liquido,
+        "churn_retroativo": churn_retro,
+        "churn_retroativo_normalizado": None if denom == 0 else round(churn_retro / denom, 4),
+        "retro_em_t0": retro_em_t0_total,
         "imports_relativos_nao_resolvidos": sorted(set(nao_resolvidos)),
     }
 
@@ -338,8 +377,8 @@ def tabela(r):
              f"denominador={f['denominador']}  LOC={f['loc']}")
     L.append(f"módulos: {', '.join(f['M']) or '(nenhum)'}")
     L.append("")
-    L.append("inc  commits  t0 (posição)      churn pós-t0")
-    L.append("---  -------  ----------------  ------------")
+    L.append("inc  commits  t0 (posição)      churn pós-t0   retroativo")
+    L.append("---  -------  ----------------  ------------   ----------")
     for i in r["incrementos"]:
         if i["t0"] is None:
             t0 = "não localizável"
@@ -348,13 +387,19 @@ def tabela(r):
             if i["t0"]["primeiro_do_repo"]:
                 t0 += "  [= 1º do repo]"
         marca = " *" if i["sem_tag"] else ""
-        L.append(f"{i['k']}{marca:2}  {i['n_commits']:7}  {t0:16}  {i['churn']:12}")
+        r_t0 = f"  (+{i['retro_em_t0']} em t0)" if i["retro_em_t0"] else ""
+        L.append(f"{i['k']}{marca:2}  {i['n_commits']:7}  {t0:16}  {i['churn']:12}   "
+                 f"{i['churn_retroativo']:10}{r_t0}")
     if any(i["sem_tag"] for i in r["incrementos"]):
         L.append("*  sem tag de aceite — commits após a última tag")
     L.append("")
     L.append(f"churn pós-t0        : {r['churn_pos_t0']}")
     L.append(f"churn normalizado   : {r['churn_normalizado']}")
     L.append(f"churn líquido (alt) : {r['churn_liquido']}")
+    L.append(f"churn retroativo    : {r['churn_retroativo']}  "
+             f"(normalizado {r['churn_retroativo_normalizado']})")
+    if r["retro_em_t0"]:
+        L.append(f"  + {r['retro_em_t0']} no próprio t0, fora da janela da primária")
     if r["imports_relativos_nao_resolvidos"]:
         L.append("")
         L.append("ATENÇÃO — imports relativos não resolvidos (E pode estar subcontada):")
@@ -365,7 +410,8 @@ def tabela(r):
             L.append("")
             L.append(f"incremento {i['k']} — commits que mexeram na arquitetura depois de t0:")
             for c in i["por_commit"]:
-                L.append(f"  {c['sha']}  ΔM={c['dM']} ΔE={c['dE']} ΔI={c['dI']}  {c['assunto'][:60]}")
+                L.append(f"  {c['sha']}  ΔM={c['dM']} ΔE={c['dE']} ΔI={c['dI']}"
+                         f"  retro={c['dR']}  {c['assunto'][:52]}")
     return "\n".join(L)
 
 

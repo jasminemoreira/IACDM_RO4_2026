@@ -101,6 +101,37 @@ export conta `ΔI=2`, renomeação de módulo conta `10`. `|ΔX|` é diferença 
 variação líquida — no mesmo histórico a leitura líquida daria `4` e faria um piloto com
 churn real parecer NO-GO por artefato do script.
 
+## 3d. Churn retroativo — medida secundária, acrescentada em 2026-08-18
+
+**A DV primária do §1 não muda.** O `extrair.py` passa a reportar, ao lado dela:
+
+```
+retro(c) = |(P △ C) ∩ B|,   B = estado no aceite do incremento anterior
+```
+
+Motivo: a fórmula do §6 conta todo commit posterior a `t₀(k)`, e depois de `t₀(k)` está o
+grosso da **construção** do incremento — no incremento 1 do braço A, 50 dos 51 pontos de
+churn são módulo novo com exports novos, e só 1 é retrabalho. Assim medido, um braço que
+constrói mais módulos pontua mais churn, que é o confundidor de escopo que o §6 tenta
+controlar por fora, com LOC.
+
+O §6 em prosa quer outra coisa: *"resolução de conflito costuma forçar mudança no modelo de
+persistência projetado no incremento 2"* — o incremento `k` desfazendo o que `k-1` construiu.
+O retroativo isola isso: só conta elemento que já existia quando o incremento começou. No
+incremento 1 dá 0 por definição.
+
+Validado no mesmo histórico sintético do §3c, com valores calculados à mão: primária
+`16` inalterada, retroativo `0 · 0 · 4`. Renomear export criado no próprio incremento dá
+`retro=0`; renomear o módulo que o incremento anterior construiu dá `retro=4`.
+
+`retro_em_t0` sai à parte: é o mesmo cálculo no próprio commit `t₀(k)`, que a primária
+exclui por definição, para não esconder o caso em que o commit que abre o incremento já
+mexe no que veio antes.
+
+**Momento da decisão:** braço A no meio do incremento 2, braço C não iniciado, nenhuma
+comparação entre braços existente. A medida não pôde ser ajustada a um resultado porque
+não havia resultado.
+
 ## 4. Discrição da operadora nos *gates* — braço C
 
 §5: anotar **toda** vez que a operadora exercer discrição em G0, G2, G4 ou G6 — o quê e
