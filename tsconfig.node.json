@@ -1,0 +1,10 @@
+{
+  "//": "Alvo Node. Só confere tipos: o Node executa os .ts diretamente, então não há emissão.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["es2023"],
+    "types": ["node"],
+    "noEmit": true
+  },
+  "include": ["src/scheduler", "src/deck", "src/review-log", "src/session", "src/storage", "src/server", "build.ts"]
+}

@@ -1,7 +1,7 @@
 {
+  "//": "Base comum. Os alvos concretos são tsconfig.browser.json e tsconfig.node.json — a fronteira de implantação que ARQ-05 exigiu declarar.",
   "compilerOptions": {
     "target": "es2022",
-    "lib": ["es2022", "dom", "dom.iterable"],
     "module": "esnext",
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
@@ -11,8 +11,7 @@
     "noImplicitOverride": true,
     "exactOptionalPropertyTypes": true,
     "verbatimModuleSyntax": true,
-    "outDir": "dist",
-    "rootDir": "src"
+    "skipLibCheck": true
   },
-  "include": ["src"]
+  "files": []
 }

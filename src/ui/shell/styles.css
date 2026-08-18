@@ -1,0 +1,87 @@
+:root {
+  --fundo: #fbfaf8;
+  --tinta: #1d1c1a;
+  --suave: #6b6862;
+  --linha: #e3e0d9;
+  --acento: #8a2b26;
+  --aviso: #8a6d1f;
+  --erro: #8a2b26;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fundo: #171614;
+    --tinta: #edeae4;
+    --suave: #9c988f;
+    --linha: #33312d;
+    --acento: #d98a80;
+    --aviso: #d9bb6a;
+    --erro: #d98a80;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--fundo);
+  color: var(--tinta);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.app {
+  max-width: 34rem;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-height: 100vh;
+}
+.oculto { display: none !important; }
+
+.faixa {
+  display: flex; align-items: center; gap: .75rem; flex-wrap: wrap;
+  padding: .6rem .8rem; border: 1px solid var(--linha); border-radius: .4rem;
+  font-size: .875rem; color: var(--suave);
+}
+.faixa[data-tipo="volatil"], .faixa[data-tipo="erro"] { color: var(--erro); border-color: currentColor; }
+.faixa[data-tipo="novaVersao"] { color: var(--aviso); border-color: currentColor; }
+.faixa-acao {
+  margin-left: auto; padding: .25rem .6rem; font: inherit; cursor: pointer;
+  background: none; color: inherit; border: 1px solid currentColor; border-radius: .3rem;
+}
+
+.progresso { font-size: .8125rem; color: var(--suave); font-variant-numeric: tabular-nums; }
+
+.cartao { display: flex; flex-direction: column; gap: 1rem; align-items: center; text-align: center; }
+/* O hanzi é o conteúdo do produto: a pilha de fontes CJK é declarada, não deixada
+   ao acaso do padrão do navegador. Num sistema sem NENHUMA fonte CJK instalada, o
+   caractere sai como caixa vazia — limitação do sistema, não da aplicação. */
+.hanzi {
+  font-size: clamp(3.5rem, 18vw, 6rem);
+  line-height: 1.1;
+  letter-spacing: .05em;
+  font-family: "Noto Sans CJK SC", "Noto Sans SC", "Source Han Sans SC", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "WenQuanYi Micro Hei", SimHei, sans-serif;
+}
+.pinyin, .gloss { font-family: inherit; }
+.pinyin { font-size: 1.5rem; color: var(--acento); }
+.gloss { font-size: 1.125rem; color: var(--suave); }
+
+.revelar, .sincronizar {
+  padding: .7rem 1.4rem; font: inherit; cursor: pointer;
+  background: none; color: inherit; border: 1px solid var(--linha); border-radius: .4rem;
+}
+.revelar:hover, .sincronizar:hover, .nota:hover { border-color: var(--acento); }
+.sincronizar { align-self: flex-start; font-size: .875rem; color: var(--suave); }
+
+.notas { display: grid; grid-template-columns: repeat(auto-fit, minmax(4.5rem, 1fr)); gap: .5rem; width: 100%; }
+.nota {
+  display: flex; flex-direction: column; align-items: center; gap: .25rem;
+  padding: .6rem .3rem; font: inherit; cursor: pointer;
+  background: none; color: inherit; border: 1px solid var(--linha); border-radius: .4rem;
+}
+.nota-ajuda { font-size: .6875rem; line-height: 1.25; color: var(--suave); }
+.nota:focus-visible, .revelar:focus-visible, .sincronizar:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
+
+.vazia, .erro { padding: 1rem 0; }
+.vazia-titulo, .erro-titulo { margin: 0 0 .5rem; font-size: 1.125rem; }
+.erro-titulo { color: var(--erro); }
+.vazia-texto, .erro-detalhe { margin: 0; color: var(--suave); }

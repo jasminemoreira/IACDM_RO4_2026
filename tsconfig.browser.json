@@ -1,0 +1,11 @@
+{
+  "//": "Alvo navegador. Emite dist/. Módulos puros (scheduler, review-log, deck, session) aparecem nos DOIS alvos — são agnósticos de implantação por construção.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["es2022", "dom", "dom.iterable"],
+    "types": [],
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": ["src/scheduler", "src/deck", "src/review-log", "src/session", "src/storage", "src/ui", "src/app"]
+}
