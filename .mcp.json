@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "versus-claude": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "/home/jasmine/INDT/RO4/hanzi-pwa-w2/.versus/server.js"
+      ],
+      "env": {}
+    }
+  }
+}

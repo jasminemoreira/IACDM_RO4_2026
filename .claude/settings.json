@@ -1,0 +1,102 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__versus-claude__get_phase_state",
+      "mcp__versus-claude__get_decisions",
+      "mcp__versus-claude__get_exit_criteria",
+      "mcp__versus-claude__advance_phase",
+      "mcp__versus-claude__start_iteration",
+      "mcp__versus-claude__record_decision",
+      "mcp__versus-claude__update_score",
+      "mcp__versus-claude__mark_exit_criterion",
+      "mcp__versus-claude__check_safeguard",
+      "mcp__versus-claude__check_all_safeguards",
+      "mcp__versus-claude__check_specs_status",
+      "mcp__versus-claude__init_project",
+      "mcp__versus-claude__get_phase_guidance",
+      "mcp__versus-claude__update_project_spec",
+      "mcp__versus-claude__start_new_cycle",
+      "Read",
+      "Write",
+      "Edit",
+      "Glob",
+      "Grep",
+      "Bash",
+      "WebFetch",
+      "WebSearch",
+      "NotebookEdit"
+    ]
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/home/jasmine/INDT/RO4/hanzi-pwa-w2/.versus/inject-context.js\""
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/home/jasmine/INDT/RO4/hanzi-pwa-w2/.versus/phase-gate.js\""
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/home/jasmine/INDT/RO4/hanzi-pwa-w2/.versus/loop-detector.js\""
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/home/jasmine/INDT/RO4/hanzi-pwa-w2/.versus/block-destructive.js\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Grep|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/home/jasmine/INDT/RO4/hanzi-pwa-w2/.versus/truncation-check.js\""
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/home/jasmine/INDT/RO4/hanzi-pwa-w2/.versus/test-outcome.js\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/home/jasmine/INDT/RO4/hanzi-pwa-w2/.versus/stop-verify.js\"",
+            "timeout": 120
+          }
+        ]
+      }
+    ]
+  }
+}
