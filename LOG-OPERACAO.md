@@ -29,7 +29,7 @@ viés de ordem que a operadora pode remover sem custo.
 
 | braço | diretório | branch remoto | início | fim |
 |---|---|---|---|---|
-| A — direto | `hanzi-pwa-w1/` | `braco-A` | — | — |
+| A — direto | `hanzi-pwa-w1/` | `braco-A` | 2026-08-18 | — |
 | C — processo exigível | `hanzi-pwa-w2/` | `braco-C` | — | — |
 
 ## 3. Decisões de montagem — coordenação, antes do início
@@ -40,6 +40,7 @@ viés de ordem que a operadora pode remover sem custo.
 | 2026-08-18 | `.gitignore` simétrico como segundo commit, antes de qualquer código (`node_modules/`, `dist/`, `.versus/state.json`) | tirar da história o que não é artefato medido, sem assimetria entre braços |
 | 2026-08-18 | **um repositório por braço**, não um repositório único com os dois em subpastas | num repo único a sessão de cada braço alcança a história e o código do outro, e o `PILOTO.md` no mesmo *work tree* |
 | 2026-08-18 | branch local de cada braço chamado `main`; o nome do braço existe **só no remoto**, via *refspec* `main:braco-A` / `main:braco-C` | mesma razão de `TAREFA-PILOTO.md` virar `REQUISITOS.md`: um branch `braco-A` denunciaria o experimento à sessão que o opera |
+| 2026-08-18 | execução **em paralelo considerada e recusada**; mantida a ordem serial A→C do §1 | no paralelo a operadora veria o modelo de persistência do braço C, desenhado na Fase 2, antes de o braço A chegar ao incremento 3; o aceite do incremento 2 de A absorveria isso e o churn tardio sumiria dos dois braços — que o §7 manda ler como NO-GO de porte. Métrica boa descartada por dica da operadora, e no braço sem gate nada registraria a dica |
 | 2026-08-18 | repositório de coordenação na raiz do `RO4/`, com os dois braços em `.gitignore` | `PILOTO.md` versionado sem entrar em nenhum *work tree* de braço |
 
 ### Renomeação dos diretórios dos braços — 2026-08-18, antes de qualquer execução
