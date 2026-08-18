@@ -30,7 +30,7 @@ viés de ordem que a operadora pode remover sem custo.
 | braço | diretório | branch remoto | início | fim |
 |---|---|---|---|---|
 | A — direto | `hanzi-pwa-w1/` | `braco-A` | 2026-08-18 | — |
-| C — processo exigível | `hanzi-pwa-w2/` | `braco-C` | — | — |
+| C — processo exigível | `hanzi-pwa-w2/` | `braco-C` | 2026-08-18 | — |
 
 Fronteiras de incremento do braço A, marcadas pela coordenação no commit em que a
 operadora declarou o aceite:
@@ -191,7 +191,13 @@ terceirizar.
 
 | data | gate | o que a operadora decidiu | por quê |
 |---|---|---|---|
-| — | — | — | — |
+| 2026-08-18 | G0 | alvo de entrega = **produto completo, 3 incrementos** (contra "MVP primeiro, depois iterar" e "protótipo") | é a leitura literal do `REQUISITOS.md` §6 — *"cada incremento é entregue e aceito antes do seguinte começar"* — e é a única opção que mantém os braços comparáveis: o braço A entregou os três. MVP teria reduzido o braço C a um terço do escopo do A, e a diferença de churn viraria diferença de tamanho |
+
+**Observação de método, não de projeto:** o instrumento *perguntou* o alvo de entrega mesmo
+com o `REQUISITOS.md` congelado respondendo à pergunta no §6. A operadora não escolheu escopo,
+transcreveu a especificação. É caso de discrição **terceirizável**: a batelada válida pode
+responder isto por regra ("alvo = o que a especificação congelada disser"), sem operador
+humano no laço. Primeiro item concreto da lista que o §5 do `PILOTO.md` manda levantar.
 
 ## 5. Descartes e intervenções
 
