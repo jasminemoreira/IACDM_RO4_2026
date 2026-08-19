@@ -31,7 +31,7 @@ viés de ordem que a operadora pode remover sem custo.
 |---|---|---|---|---|
 | A — direto | `hanzi-pwa-w1/` | `braco-A` | 2026-08-18 | — |
 | C — processo exigível (1ª execução, **descartada**) | `_descartado/hanzi-pwa-w2/` | `braco-C-descartado` | 2026-08-18 | 2026-08-18 |
-| C — processo exigível (2ª execução) | `hanzi-pwa-w2/` | `braco-C` | — | — |
+| C — processo exigível (2ª execução) | `hanzi-pwa-w2/` | `braco-C` | 2026-08-18 | — |
 
 Fronteiras de incremento do braço A, marcadas pela coordenação no commit em que a
 operadora declarou o aceite:
@@ -47,6 +47,12 @@ Braço C:
 | inc | tag | commit | data | commits | `t₀` |
 |---|---|---|---|---|---|
 | 1 | `inc1-fim` | `206604d` | 2026-08-18 | 16 | `321fa56`, posição **15/16** |
+
+Braço C, 2ª execução:
+
+| inc | tag | commit | data | commits | `t₀` |
+|---|---|---|---|---|---|
+| 1 | `inc1-fim` | `6b3ba02` | 2026-08-18 | 11 | `2cf4a7e`, posição 5/11 |
 
 ## 3. Decisões de montagem — coordenação, antes do início
 
@@ -259,6 +265,22 @@ Isto torna os braços não comparáveis na primária por um motivo que nada tem 
 a mesma quantidade de retrabalho produz números diferentes conforme o tamanho do commit.
 Corresponde à linha REDESENHO do §7 do `PILOTO.md` — *"granularidade de commit como exigência"* —
 e a exigência já está na especificação congelada; o que falta é ela ser operada.
+
+### Granularidade na 2ª execução do braço C
+
+A assimetria que motivou parte do descarte não se repetiu. Incremento 1:
+
+| | braço A | braço C, 1ª exec. (descartada) | braço C, 2ª exec. |
+|---|---|---|---|
+| commits no incremento | 11 | 16 | 11 |
+| commits com código | 8 | **2** | 6 |
+| `t₀` | 4/11 | **15/16** | 5/11 |
+| janela pós-`t₀` | 7 | **1** | 5 |
+| LOC | 1117 | 1221 | 1101 |
+
+A janela pós-`t₀` do braço C voltou a ter granularidade suficiente para a primária observar
+churn, e os dois braços ficaram com contagem de commits e LOC próximos — o confundidor de
+escopo que o §6 monitora está pequeno neste incremento.
 
 ## 5. Descartes e intervenções
 
