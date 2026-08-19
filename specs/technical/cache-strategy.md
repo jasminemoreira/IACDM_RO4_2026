@@ -22,11 +22,27 @@ uma sessão de revisão em curso.
 falha e o SW não ativa. Não existe estado persistente "instalado com cache parcial"
 (resolve RES-01).
 
-## Sinais emitidos para a aplicação (OBS-02)
+## Sinais emitidos para a aplicação (OBS-02, IMP-06)
 
-- `offline-ready` — o precache concluiu; a aplicação pode afirmar ao usuário que
-  funciona sem rede.
-- `sw-version` — identifica a build do service worker ativo, para diagnóstico.
+Mecanismo concreto: o módulo `service-worker` registra via `registerSW` do
+`vite-plugin-pwa`, cujos callbacks são alimentados pelo ciclo de vida do próprio
+service worker (`workbox-window` por baixo).
+
+- `onOfflineReady` — o precache concluiu; a interface passa a exibir
+  "pronto para uso sem rede" na linha de estado.
+- `onNeedRefresh` — há versão nova instalada esperando (`registerType: 'prompt'`),
+  então a troca nunca acontece por baixo de uma sessão em curso.
+- `onRegisterError` — o registro falhou (ex.: fora de contexto seguro).
+
+## Verificação mecânica (C-17)
+
+A sincronia entre este documento e `vite.config.ts` é checada por teste na Fase 6:
+o manifesto gerado em `dist/sw.js` deve conter `index.html`, `deck.json` e os dois
+ícones. Documento normativo que só depende de disciplina foi o achado GOV-04.
+
+Estado verificado no build atual: 10 entradas de precache, `deck.json` presente
+com revisão de conteúdo — que é o que impede MIG-01 (servir para sempre a v1 do
+baralho e nunca disparar a migração).
 
 ## Campos obrigatórios do manifest (REG-03)
 
