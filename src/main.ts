@@ -12,8 +12,15 @@
 
 import { loadDeck, type DeckError } from './deck/index.ts'
 import type { DeviceId } from './progress/index.ts'
+import { registerServiceWorker } from './service-worker/index.ts'
 import { Session } from './session/index.ts'
-import { createMemoryRepositories, type Repositories } from './storage/index.ts'
+import {
+  createIndexedDbRepositories,
+  createMemoryRepositories,
+  openDb,
+  type Repositories,
+  type StorageError,
+} from './storage/index.ts'
 import { mount } from './ui/index.ts'
 
 async function resolveDeviceId(repos: Repositories): Promise<DeviceId> {
@@ -28,8 +35,13 @@ async function boot(): Promise<void> {
   const root = document.getElementById('app')
   if (!root) throw new Error('elemento #app ausente')
 
-  // Incremento 1 (§6): sem persistência além da sessão em memória.
-  const repos = createMemoryRepositories()
+  let offlineReady = false
+
+  // Incremento 2: persistência real. A troca do adaptador não toca em nenhum
+  // módulo do núcleo — é para isso que a porta existe.
+  const db = await openDb()
+  const repos: Repositories = db.ok ? createIndexedDbRepositories(db.value) : createMemoryRepositories()
+
   const deviceId = await resolveDeviceId(repos)
 
   const session = new Session({
@@ -39,7 +51,23 @@ async function boot(): Promise<void> {
     newId: () => crypto.randomUUID(),
   })
 
-  mount(root, session, { quotaWarning: () => session.quotaWarning() })
+  mount(root, session, {
+    quotaWarning: () => session.quotaWarning(),
+    offlineReady: () => offlineReady,
+  })
+
+  registerServiceWorker({
+    onOfflineReady() {
+      offlineReady = true
+      session.notifyChange()
+    },
+  })
+
+  // RES-02: falha de armazenamento é explícita e visível, nunca quebra silenciosa.
+  if (!db.ok) {
+    session.fail('storage', describeStorageError(db.error))
+    return
+  }
 
   const deck = await loadDeck((url) => fetch(url))
   if (!deck.ok) {
@@ -47,6 +75,21 @@ async function boot(): Promise<void> {
     return
   }
   await session.start(deck.value)
+}
+
+function describeStorageError(e: StorageError): string {
+  switch (e.kind) {
+    case 'unavailable':
+      return `o armazenamento local não está disponível (${e.message}). Em janela anônima isso é esperado.`
+    case 'blocked':
+      return 'outra aba está com uma versão anterior do banco aberta — feche-a e recarregue'
+    case 'quota-exceeded':
+      return 'o espaço de armazenamento do navegador está esgotado'
+    case 'upgrade-failed':
+      return `falha ao atualizar o banco local: ${e.message}`
+    case 'write-failed':
+      return `falha ao gravar: ${e.message}`
+  }
 }
 
 function describeDeckError(e: DeckError): string {

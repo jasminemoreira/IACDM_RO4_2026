@@ -109,6 +109,12 @@ export class Session implements SessionApi {
 
   #emit(v: SessionView): void {
     this.#view = v
+    this.notifyChange()
+  }
+
+  /** Re-renderiza sem mudar de estado — usado quando um sinal externo chega
+   *  (por exemplo o `offline-ready` do service worker). */
+  notifyChange(): void {
     for (const l of this.#listeners) l()
   }
 

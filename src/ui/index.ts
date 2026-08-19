@@ -40,6 +40,8 @@ const el = <K extends keyof HTMLElementTagNameMap>(
 export type MountOptions = {
   /** Exibido quando o uso de armazenamento passa do limiar de C-19. */
   quotaWarning?: () => boolean
+  /** OBS-02: o precache concluiu — a aplicação pode AFIRMAR que funciona sem rede. */
+  offlineReady?: () => boolean
   /** Presente a partir do Incremento 3. */
   syncEnabled?: boolean
 }
@@ -93,15 +95,16 @@ export function mount(root: HTMLElement, api: SessionApi, opts: MountOptions = {
 
 function statusFor(v: SessionView, opts: MountOptions): string {
   const warn = opts.quotaWarning?.() ? ' · atenção: armazenamento local quase cheio' : ''
+  const off = opts.offlineReady?.() ? ' · pronto para uso sem rede' : ''
   switch (v.state) {
     case 'showing':
     case 'revealed':
     case 'writing':
-      return `cartão ${v.index} de ${v.total}${warn}` // UX-05
+      return `cartão ${v.index} de ${v.total}${off}${warn}` // UX-05
     case 'done':
-      return `sessão concluída · ${v.reviewed} ${v.reviewed === 1 ? 'cartão revisado' : 'cartões revisados'}${warn}`
+      return `sessão concluída · ${v.reviewed} ${v.reviewed === 1 ? 'cartão revisado' : 'cartões revisados'}${off}${warn}`
     case 'queue-empty':
-      return `nada devido agora${warn}`
+      return `nada devido agora${off}${warn}`
     case 'loading':
       return 'carregando…'
     case 'error':
