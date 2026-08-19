@@ -21,6 +21,7 @@ import {
   type Repositories,
   type StorageError,
 } from './storage/index.ts'
+import { conflictScenarioEvents, createLocalDoubleTransport, sync } from './sync/index.ts'
 import { mount } from './ui/index.ts'
 
 async function resolveDeviceId(repos: Repositories): Promise<DeviceId> {
@@ -44,16 +45,34 @@ async function boot(): Promise<void> {
 
   const deviceId = await resolveDeviceId(repos)
 
+  // Incremento 3: o remoto é um duplo local atrás da porta de transporte
+  // (decisão de P0; §6 Inc.3 permite explicitamente).
+  const transport = db.ok ? await createLocalDoubleTransport() : null
+
   const session = new Session({
     repos,
     deviceId,
     clock: () => new Date(),
     newId: () => crypto.randomUUID(),
+    ...(transport ? { sync: () => sync(repos, transport, Date.now()) } : {}),
   })
+
+  if (transport) {
+    // Afinador de teste, não funcionalidade: semeia no REMOTO os eventos do
+    // dispositivo B de specs/datasets/cenario-conflito.md, para que a
+    // reconciliação possa ser observada por uma pessoa num navegador só.
+    Object.defineProperty(globalThis, '__hanziSeedRemote', {
+      value: async () => {
+        await transport.merge(conflictScenarioEvents())
+        return 'cenário de conflito semeado no remoto — agora clique em Sincronizar'
+      },
+    })
+  }
 
   mount(root, session, {
     quotaWarning: () => session.quotaWarning(),
     offlineReady: () => offlineReady,
+    syncEnabled: transport !== null, // C-20
   })
 
   registerServiceWorker({
