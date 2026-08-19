@@ -53,6 +53,7 @@ Braço C, 2ª execução:
 | inc | tag | commit | data | commits | `t₀` |
 |---|---|---|---|---|---|
 | 1 | `inc1-fim` | `6b3ba02` | 2026-08-18 | 11 | `2cf4a7e`, posição 5/11 |
+| 2 | `inc2-fim` | `ba2ec08` | 2026-08-18 | 5 | `f8ac775`, posição 2/5 |
 
 ## 3. Decisões de montagem — coordenação, antes do início
 
@@ -281,6 +282,37 @@ A assimetria que motivou parte do descarte não se repetiu. Incremento 1:
 A janela pós-`t₀` do braço C voltou a ter granularidade suficiente para a primária observar
 churn, e os dois braços ficaram com contagem de commits e LOC próximos — o confundidor de
 escopo que o §6 monitora está pequeno neste incremento.
+
+### Confundidor de escopo no incremento 2 — registrar antes de qualquer leitura
+
+| ao fim do incremento 2 | braço A | braço C |
+|---|---|---|
+| LOC | 2537 | **1334** |
+| `\|M\|` `\|E\|` `\|I\|` | 7 · 13 · 85 | 7 · 15 · 65 |
+| churn pós-`t₀` no inc. 2 | 45 | **4** |
+| retro de linha no inc. 2 | 54 | **7** |
+
+O §6 do `PILOTO.md` avisa exatamente para este caso: *"LOC final, como confundidor — menos
+churn com menos código é escopo menor, não convergência"*. O braço A tem **1,9×** o código do
+braço C ao fim do mesmo incremento. Qualquer leitura das duas colunas de churn sem essa
+terceira é leitura de escopo disfarçada de leitura de método.
+
+**Fato de arquitetura a registrar, sem interpretação:** o módulo `progress/` do braço C contém,
+desde o **incremento 1** (`5985f01`), a álgebra do log de revisões — união de G-Set, ordem
+canônica e *replay*. No braço A, o equivalente aparece só no **incremento 3** (`be4ddfc`), e
+aparece como reescrita do modelo de persistência do incremento 2. Registrado agora, antes de
+o incremento 3 do braço C existir, para que a observação não seja construída depois do fato.
+
+**O §1 do `PILOTO.md` continua valendo:** nada disto é evidência sobre a H10. n=1, tarefa
+escolhida depois da hipótese, operadora autora do método, e o braço C ainda por cima está na
+2ª execução com o braço A já conhecido.
+
+### A medida de interface ainda não disparou em lugar nenhum
+
+`retro-interface` = 0 nos três incrementos do braço A e nos dois do braço C até aqui, incluindo
+o commit do braço A que reescreveu 176 linhas do modelo de persistência. A medida de linha
+disparou nos dois braços. Isto é achado de medibilidade por si: a granularidade de `M`/`E`/`I`
+pode ser grosseira demais para o porte deste projeto, independentemente do braço.
 
 ## 5. Descartes e intervenções
 
