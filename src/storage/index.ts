@@ -119,3 +119,6 @@ export function createMemoryRepositories(): Repositories {
     },
   }
 }
+
+/** Adaptador de produção (Incremento 2). O núcleo não sabe que ele existe. */
+export { openDb, createIndexedDbRepositories } from './indexeddb.ts'
