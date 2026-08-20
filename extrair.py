@@ -2,6 +2,7 @@
 """Extrai M, E, I, t0 e churn pós-t0 do histórico git de um braço do piloto RO4.
 
     python3 extrair.py <repo>            # tabela legível
+    python3 extrair.py <repo> --ate <ref>  # limita a análise até <ref> (tag/commit)
     python3 extrair.py <repo> --json     # dado bruto
     python3 extrair.py <repo> --commits  # estado commit a commit
 
@@ -18,6 +19,29 @@ no REQUISITOS.md congelado e não pede nada ao modelo que a tarefa já não peç
 
 Sem as tags o script FALHA ALTO. Não estima fronteira, não cai para melhor
 esforço: um churn calculado sobre incremento errado pareceria um resultado.
+
+RÉGUA v2 — o que o piloto obrigou a mudar
+-----------------------------------------
+O piloto (RESULTADO-PILOTO.md) mostrou três defeitos na DV registrada. As três
+correções convivem com a medida original, que continua sendo impressa como `v1
+(registrada)` para que nada se perca na transição:
+
+1. JANELA INCLUSIVA. A v1 contava commits > t0(k). Em 3 dos 6 incrementos medidos
+   t0 foi o PRIMEIRO commit do incremento, e o único retrabalho arquitetural do
+   estudo (be4ddfc, 176 linhas do modelo de persistência) ERA o t0(3) — fora da
+   janela por definição. A v2 conta a partir de t0(k) INCLUSIVE: o delta do próprio
+   t0 é medido contra o fim do incremento anterior, que é precisamente onde
+   "este incremento desfez o que o anterior construiu" aparece.
+
+2. LINHA COMO PRINCIPAL. `retro-interface` marcou 0 nos 6 incrementos, incluindo o
+   be4ddfc. M/E/I medem a superfície do módulo e não veem troca de modelo interno.
+   O churn retroativo de LINHA passa a ser a medida principal; a estrutural fica
+   como secundária, útil para renomeação e reorganização, que a de linha não pega.
+
+3. GRANULARIDADE DECLARADA. A DV é computada por commit, então mede o tamanho do
+   commit junto com o retrabalho. Cada incremento agora reporta quantos commits
+   tocam código: 1 = mínima (churn interno ao incremento é inobservável), 2 =
+   limitada, 3+ = ok. Sai como ATENÇÃO, não como nota de rodapé.
 
 DEFINIÇÕES (§6)
 ---------------
@@ -114,10 +138,15 @@ def git(repo, *args):
     return r.stdout
 
 
-def commits(repo):
-    """Histórico linear, do mais antigo ao mais novo."""
+def commits(repo, ate="HEAD"):
+    """Histórico linear, do mais antigo ao mais novo, até `ate` inclusive.
+
+    `--ate` existe porque um braço pode seguir além da fronteira do estudo — no RO4 o
+    braço C abriu ciclo novo depois de `inc3-fim`. Medir até HEAD misturaria trabalho
+    fora do enunciado congelado com o dado do piloto.
+    """
     saida = git(repo, "log", "--first-parent", "--reverse",
-                "--format=%H%x1f%aI%x1f%s", "HEAD").strip()
+                "--format=%H%x1f%aI%x1f%s", ate).strip()
     if not saida:
         raise Falha("repositório sem commits")
     out = []
@@ -322,8 +351,8 @@ def incrementos(repo, hist):
     return out
 
 
-def analisar(repo):
-    hist = commits(repo)
+def analisar(repo, ate="HEAD"):
+    hist = commits(repo, ate)
     incs = incrementos(repo, hist)
 
     estados, nao_resolvidos = {}, []
@@ -362,6 +391,7 @@ def analisar(repo):
             },
             "churn": 0, "churn_retroativo": 0, "retro_em_t0": 0, "por_commit": [],
             "churn_linha": 0, "linha_por_commit": [],
+            "churn_v2": 0, "retro_v2": 0, "commits_codigo": 0, "granularidade": "—",
         }
         base_sha = None if idx_inc == 0 else incs[idx_inc - 1]["commits"][-1]["sha"]
         item["churn_linha"], item["linha_por_commit"] = churn_linha(repo, base_sha, cs)
@@ -371,7 +401,27 @@ def analisar(repo):
                     + len((cur["E"] ^ ant["E"]) & base["E"])
                     + len((cur["I"] ^ ant["I"]) & base["I"]))
 
+        # granularidade: quantos commits do incremento tocam código executável sob src/
+        n_cod = 0
+        for c in cs:
+            gp = next(j for j, h in enumerate(hist) if h["sha"] == c["sha"])
+            if toca_codigo(repo, c["sha"], hist[gp - 1]["sha"] if gp > 0 else None):
+                n_cod += 1
+        item["commits_codigo"] = n_cod
+        item["granularidade"] = ("mínima" if n_cod <= 1 else
+                                 "limitada" if n_cod == 2 else "ok")
+
         if t0_idx is not None:
+            # v2: janela INCLUSIVA — o delta do próprio t0 contra o fim do incremento anterior
+            for c in cs[t0_idx:]:
+                gp = next(j for j, h in enumerate(hist) if h["sha"] == c["sha"])
+                if gp == 0:
+                    continue
+                a, b = estados[hist[gp - 1]["sha"]], estados[c["sha"]]
+                item["churn_v2"] += (len(b["M"] ^ a["M"]) + len(b["E"] ^ a["E"])
+                                     + len(b["I"] ^ a["I"]))
+                item["retro_v2"] += retro(a, b)
+
             gt0 = next(j for j, h in enumerate(hist) if h["sha"] == cs[t0_idx]["sha"])
             if gt0 > 0:
                 item["retro_em_t0"] = retro(estados[hist[gt0 - 1]["sha"]],
@@ -417,6 +467,9 @@ def analisar(repo):
         "churn_retroativo_normalizado": None if denom == 0 else round(churn_retro / denom, 4),
         "retro_em_t0": retro_em_t0_total,
         "churn_linha_retroativo": sum(i["churn_linha"] for i in detalhe),
+        "churn_v2": sum(i["churn_v2"] for i in detalhe),
+        "retro_v2": sum(i["retro_v2"] for i in detalhe),
+        "granularidade_minima": [i["k"] for i in detalhe if i["granularidade"] != "ok"],
         "imports_relativos_nao_resolvidos": sorted(set(nao_resolvidos)),
     }
 
@@ -424,14 +477,15 @@ def analisar(repo):
 def tabela(r):
     L = []
     L.append(f"braço  : {r['repo']}")
-    L.append(f"HEAD   : {r['head'][:8]}   commits: {r['n_commits']}")
+    L.append(f"até    : {r['head'][:8]}   commits: {r['n_commits']}")
     f = r["final"]
     L.append(f"final  : |M|={f['n_M']}  |E|={f['n_E']}  |I|={f['n_I']}  "
              f"denominador={f['denominador']}  LOC={f['loc']}")
     L.append(f"módulos: {', '.join(f['M']) or '(nenhum)'}")
     L.append("")
-    L.append("inc  commits  t0 (posição)      churn pós-t0   retro-interface   retro-linha")
-    L.append("---  -------  ----------------  ------------   ---------------   -----------")
+    L.append("                                           PRINCIPAL   janela inclusiva (v2)     v1")
+    L.append("inc  commits  t0 (posição)      granul.  retro-linha   churn  retro-estr.   churn")
+    L.append("---  -------  ----------------  -------  -----------   -----  -----------   -----")
     for i in r["incrementos"]:
         if i["t0"] is None:
             t0 = "não localizável"
@@ -440,21 +494,24 @@ def tabela(r):
             if i["t0"]["primeiro_do_repo"]:
                 t0 += "  [= 1º do repo]"
         marca = " *" if i["sem_tag"] else ""
-        r_t0 = f"  (+{i['retro_em_t0']} em t0)" if i["retro_em_t0"] else ""
-        L.append(f"{i['k']}{marca:2}  {i['n_commits']:7}  {t0:16}  {i['churn']:12}   "
-                 f"{i['churn_retroativo']:10}{r_t0:14}   {i['churn_linha']:11}")
+        L.append(f"{i['k']}{marca:2}  {i['n_commits']:7}  {t0:16}  {i['granularidade']:7}  "
+                 f"{i['churn_linha']:11}   {i['churn_v2']:5}  {i['retro_v2']:11}   {i['churn']:5}")
     if any(i["sem_tag"] for i in r["incrementos"]):
         L.append("*  sem tag de aceite — commits após a última tag")
     L.append("")
-    L.append(f"churn pós-t0        : {r['churn_pos_t0']}")
-    L.append(f"churn normalizado   : {r['churn_normalizado']}")
-    L.append(f"churn líquido (alt) : {r['churn_liquido']}")
-    L.append(f"churn retroativo    : {r['churn_retroativo']}  "
-             f"(normalizado {r['churn_retroativo_normalizado']})")
-    L.append(f"retro de linha      : {r['churn_linha_retroativo']}  "
-             f"(LOC final {r['final']['loc']})")
-    if r["retro_em_t0"]:
-        L.append(f"  + {r['retro_em_t0']} no próprio t0, fora da janela da primária")
+    L.append(f"PRINCIPAL  retro de linha            : {r['churn_linha_retroativo']}"
+             f"   (LOC final {r['final']['loc']})")
+    L.append(f"           estrutural, janela incl.  : {r['churn_v2']}"
+             f"   retroativo estrutural: {r['retro_v2']}")
+    L.append(f"v1 regist. churn pós-t0 (exclusiva)  : {r['churn_pos_t0']}"
+             f"   (normalizado {r['churn_normalizado']})")
+    if r["granularidade_minima"]:
+        L.append("")
+        L.append("ATENÇÃO — granularidade insuficiente nos incrementos "
+                 + ", ".join(str(k) for k in r["granularidade_minima"]) + ".")
+        L.append("  A DV é computada por commit. Incremento com 1 commit de código não permite")
+        L.append("  observar churn interno ao incremento; com 2, a observação é limitada. O número")
+        L.append("  sai, mas não distingue 'não houve retrabalho' de 'não havia como ver'.")
     if r["imports_relativos_nao_resolvidos"]:
         L.append("")
         L.append("ATENÇÃO — imports relativos não resolvidos (E pode estar subcontada):")
@@ -481,8 +538,9 @@ def main():
         print(__doc__.strip().split("\n\n")[1], file=sys.stderr)
         return 2
     repo = sys.argv[1]
+    ate = sys.argv[sys.argv.index("--ate") + 1] if "--ate" in sys.argv else "HEAD"
     try:
-        r = analisar(repo)
+        r = analisar(repo, ate)
     except Falha as e:
         print(f"FALHA: {e}", file=sys.stderr)
         return 1
